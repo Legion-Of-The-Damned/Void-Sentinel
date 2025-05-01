@@ -1,0 +1,181 @@
+2025-04-29 20:10:30,216 - root - ERROR - Ошибка при синхронизации команд: Client does not have an application_id set. Either the function was called before on_ready was called or application_id was not passed to the Client constructor.
+2025-04-29 20:10:30,219 - root - ERROR - Ошибка при установке статуса: 'NoneType' object has no attribute 'change_presence'
+2025-04-29 20:10:30,228 - discord.client - INFO - logging in using static token
+2025-04-29 20:10:31,844 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 24926afc2e120a8bf91cfb55f84f0534).
+2025-04-29 20:10:33,873 - root - INFO - Cog ClanInfo загружен.
+2025-04-29 20:15:44,403 - discord.client - INFO - logging in using static token
+2025-04-29 20:15:45,645 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 2dab9a210ec9f45cf2d1798d3d21464b).
+2025-04-29 20:15:47,677 - root - INFO - Cog ClanInfo загружен.
+2025-04-29 20:15:48,021 - root - INFO - Команды успешно синхронизированы.
+2025-04-29 20:15:48,023 - root - INFO - Статус бота установлен.
+2025-04-29 20:23:10,213 - discord.client - INFO - logging in using static token
+2025-04-29 20:23:11,383 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 54cbefc167dc3cee5a85df7a76aa4b63).
+2025-04-29 20:23:13,436 - root - INFO - Cog ClanInfo загружен.
+2025-04-29 20:23:13,987 - root - INFO - Команды успешно синхронизированы.
+2025-04-29 20:23:13,988 - root - INFO - Статус бота установлен.
+2025-04-29 20:24:41,382 - root - INFO - Webhook создан в канале: 💻тестовая-станция🧪 для сервера Legion Of The Damned
+2025-04-29 20:24:41,955 - root - INFO - Информация о членах клана успешно отправлена в канал 💻тестовая-станция🧪.
+2025-04-29 20:24:45,284 - root - INFO - Webhook создан в канале: 💻тестовая-станция🧪 для сервера Legion Of The Damned
+2025-04-29 20:24:45,888 - root - INFO - Информация о членах клана успешно отправлена в канал 💻тестовая-станция🧪.
+2025-04-29 20:25:01,171 - root - INFO - Webhook создан в канале: 💻тестовая-станция🧪 для сервера Legion Of The Damned
+2025-04-29 20:25:01,711 - root - INFO - Информация о членах клана успешно отправлена в канал 💻тестовая-станция🧪.
+2025-04-29 20:27:53,209 - discord.client - INFO - logging in using static token
+2025-04-29 20:27:54,399 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: c37cf43407b9c9c2add9e497ffe4dcbd).
+2025-04-29 20:27:56,445 - root - INFO - Cog ClanInfo загружен.
+2025-04-29 20:27:56,836 - root - INFO - Команды успешно синхронизированы.
+2025-04-29 20:27:56,837 - root - INFO - Статус бота установлен.
+2025-04-29 20:34:28,945 - discord.client - INFO - logging in using static token
+2025-04-29 20:34:30,325 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 65503a187296bff6b520242dcd7aac40).
+2025-04-29 20:34:32,356 - root - INFO - Cog ClanInfo загружен.
+2025-04-29 20:34:32,762 - root - INFO - Команды успешно синхронизированы.
+2025-04-29 20:34:32,763 - root - INFO - Статус бота установлен.
+2025-04-29 20:35:12,200 - discord.app_commands.tree - ERROR - Ignoring exception in command tree
+Traceback (most recent call last):
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1151, in wrapper
+    await self._call(interaction)
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1283, in _call
+    command, options = self._get_app_command_options(data)
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1187, in _get_app_command_options
+    raise CommandNotFound(name, parents)
+discord.app_commands.errors.CommandNotFound: Application command 'состав_клана' not found
+2025-04-29 20:35:22,485 - root - INFO - Webhook создан в канале: 💻тестовая-станция🧪 для сервера Legion Of The Damned
+2025-04-29 20:35:23,096 - root - INFO - Информация о членах клана успешно отправлена в канал 💻тестовая-станция🧪.
+2025-05-01 15:42:46,375 - root - INFO - 🚀 Запуск бота...
+2025-05-01 15:42:46,396 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 15:42:46,422 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 15:42:46,440 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 15:42:46,444 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 15:42:46,445 - discord.client - INFO - logging in using static token
+2025-05-01 15:42:47,980 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 0438d01f290bfa7e5190ce747aa28189).
+2025-05-01 15:42:50,030 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 15:42:50,033 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 15:42:50,475 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 15:42:50,480 - root - INFO - Статус бота установлен.
+2025-05-01 15:42:58,352 - discord.app_commands.tree - ERROR - Ignoring exception in command tree
+Traceback (most recent call last):
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1151, in wrapper
+    await self._call(interaction)
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1283, in _call
+    command, options = self._get_app_command_options(data)
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1187, in _get_app_command_options
+    raise CommandNotFound(name, parents)
+discord.app_commands.errors.CommandNotFound: Application command 'состав_клана' not found
+2025-05-01 15:43:19,381 - root - INFO - 📡 Webhook создан в канале: 💻тестовая-станция🧪 для сервера Legion Of The Damned
+2025-05-01 15:43:20,255 - root - INFO - ✅ Информация отправлена (10 участников).
+2025-05-01 15:51:08,048 - root - INFO - 🚀 Запуск бота...
+2025-05-01 15:51:08,053 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 15:51:08,066 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 15:51:08,079 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 15:51:08,081 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 15:51:08,082 - discord.client - INFO - logging in using static token
+2025-05-01 15:51:09,536 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: b368a5f8e23fc37a3a92c7c5613c5d57).
+2025-05-01 15:51:11,569 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 15:51:11,570 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 15:51:11,917 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 15:51:11,917 - root - INFO - Статус бота установлен.
+2025-05-01 15:51:40,183 - discord.app_commands.tree - ERROR - Ignoring exception in command tree
+Traceback (most recent call last):
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1151, in wrapper
+    await self._call(interaction)
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1283, in _call
+    command, options = self._get_app_command_options(data)
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\app_commands\tree.py", line 1187, in _get_app_command_options
+    raise CommandNotFound(name, parents)
+discord.app_commands.errors.CommandNotFound: Application command 'состав_клана' not found
+2025-05-01 15:55:51,150 - root - INFO - 🚀 Запуск бота...
+2025-05-01 15:55:51,154 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 15:55:51,159 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 15:55:51,224 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 15:55:51,249 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 15:55:51,250 - discord.client - INFO - logging in using static token
+2025-05-01 15:55:52,574 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 993f12b6ad8b58a46d5e0c9ebcecb250).
+2025-05-01 15:55:54,720 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 15:55:54,721 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 15:55:55,090 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 15:55:55,091 - root - INFO - Статус бота установлен.
+2025-05-01 15:57:20,755 - asyncio - ERROR - Task exception was never retrieved
+future: <Task finished name='discord-ui-view-timeout-ef6001e69f70b312917aa9088def4e81' coro=<VotingView.on_timeout() done, defined at C:\Users\Kraken_5491\Desktop\Void_Sentinel\cogs\duel.py:188> exception=NotFound('404 Not Found (error code: 10015): Unknown Webhook')>
+Traceback (most recent call last):
+  File "C:\Users\Kraken_5491\Desktop\Void_Sentinel\cogs\duel.py", line 205, in on_timeout
+    await self.webhook.send(embed=embed)
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\webhook\async_.py", line 1857, in send
+    data = await adapter.execute_webhook(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<11 lines>...
+    )
+    ^
+  File "C:\Users\Kraken_5491\AppData\Local\Programs\Python\Python313\Lib\site-packages\discord\webhook\async_.py", line 224, in request
+    raise NotFound(response, data)
+discord.errors.NotFound: 404 Not Found (error code: 10015): Unknown Webhook
+2025-05-01 15:58:17,986 - root - INFO - Webhook создан в канале: 💬чат-канал💬 для сервера Legion Of The Damned
+2025-05-01 15:58:18,248 - root - INFO - Отправил приветственное сообщение для infinite_5491.
+2025-05-01 15:59:47,918 - root - INFO - 🚀 Запуск бота...
+2025-05-01 15:59:47,925 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 15:59:47,931 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 15:59:47,936 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 15:59:47,938 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 15:59:47,938 - discord.client - INFO - logging in using static token
+2025-05-01 15:59:49,404 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 5a4406c9e1c67aeeac9ef01f14708120).
+2025-05-01 15:59:51,455 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 15:59:51,457 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 15:59:51,898 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 15:59:51,899 - root - INFO - Статус бота установлен.
+2025-05-01 16:05:37,305 - root - INFO - 🚀 Запуск бота...
+2025-05-01 16:05:37,312 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 16:05:37,317 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 16:05:37,333 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 16:05:37,336 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 16:05:37,336 - discord.client - INFO - logging in using static token
+2025-05-01 16:05:38,860 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 4588b0d0b5d0fdb1f5359a936973d900).
+2025-05-01 16:05:40,912 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 16:05:40,914 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 16:05:41,794 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 16:05:41,799 - root - INFO - Статус бота установлен.
+2025-05-01 16:06:27,953 - root - INFO - 🚀 Запуск бота...
+2025-05-01 16:06:27,957 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 16:06:27,962 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 16:06:27,976 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 16:06:27,979 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 16:06:27,979 - discord.client - INFO - logging in using static token
+2025-05-01 16:06:29,247 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 64003ab536df0869d92a9db97bd1b4a5).
+2025-05-01 16:06:31,311 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 16:06:31,313 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 16:06:31,621 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 16:06:31,622 - root - INFO - Статус бота установлен.
+2025-05-01 16:09:17,169 - root - INFO - 🚀 Запуск бота...
+2025-05-01 16:09:17,174 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 16:09:17,179 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 16:09:17,194 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 16:09:17,197 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 16:09:17,197 - discord.client - INFO - logging in using static token
+2025-05-01 16:09:18,447 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 55f442e1bb697edc133d6487680ea7e0).
+2025-05-01 16:09:20,485 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 16:09:20,487 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 16:09:20,816 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 16:09:20,816 - root - INFO - Статус бота установлен.
+2025-05-01 16:12:47,005 - root - INFO - 🚀 Запуск бота...
+2025-05-01 16:12:47,014 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 16:12:47,020 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 16:12:47,024 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 16:12:47,026 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 16:12:47,027 - discord.client - INFO - logging in using static token
+2025-05-01 16:12:48,219 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: ebff8acb9f6a0e413410c32150bd910d).
+2025-05-01 16:12:50,274 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 16:12:50,276 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 16:12:50,693 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 16:12:50,694 - root - INFO - Статус бота установлен.
+2025-05-01 16:33:00,059 - root - INFO - 🚀 Запуск бота...
+2025-05-01 16:33:00,068 - root - INFO - ✅ Загружен cog: cogs.events
+2025-05-01 16:33:00,084 - root - INFO - ✅ Загружен cog: cogs.commands
+2025-05-01 16:33:00,096 - root - INFO - ✅ Загружен cog: cogs.duel
+2025-05-01 16:33:00,098 - root - INFO - ✅ Загружен cog: cogs.clan_info
+2025-05-01 16:33:00,098 - root - ERROR - ⚠️ Ошибка при загрузке cog cogs.admin: Extension 'cogs.admin' could not be loaded or found.
+2025-05-01 16:33:00,099 - discord.client - INFO - logging in using static token
+2025-05-01 16:33:01,416 - discord.gateway - INFO - Shard ID None has connected to Gateway (Session ID: 266fb3c431c6ef61308995d54d238981).
+2025-05-01 16:33:03,461 - root - INFO - ✅ Бот Void Sentinel#5662 успешно запущен (ID: 1230464176745480254)
+2025-05-01 16:33:03,462 - root - INFO - ✅ Cog ClanInfo загружен.
+2025-05-01 16:33:03,928 - root - INFO - Команды успешно синхронизированы.
+2025-05-01 16:33:03,929 - root - INFO - Статус бота установлен.
