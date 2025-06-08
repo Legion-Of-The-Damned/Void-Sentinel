@@ -3,11 +3,12 @@ import logging
 from discord.ext import commands
 
 class Events(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot, avatar_url, image_url):
         self.bot = bot
+        self.avatar_url = avatar_url
+        self.image_url = image_url
 
     async def send_welcome_message(self, member, webhook):
-        """Отправляет приветственное сообщение через вебхук."""
         guild = member.guild
         message_content = f"Добро пожаловать на сервер {guild.name}, {member.mention}!"
         embed = discord.Embed(
@@ -15,7 +16,6 @@ class Events(commands.Cog):
             title="Мы рады видеть тебя в нашем сообществе! Надеемся, что тебе здесь понравится!"
         )
 
-        # Добавляем иконку сервера, если она есть
         guild_icon_url = guild.icon.url if guild.icon else None
         if guild_icon_url:
             embed.set_thumbnail(url=guild_icon_url)
@@ -24,20 +24,19 @@ class Events(commands.Cog):
             name="Пожалуйста, ознакомься с правилами, чтобы избежать недоразумений!",
             value="",
         )
-        embed.set_image(url="https://media.tenor.com/Z4qdmT3xzJ4AAAAM/welcome-server.gif")
+        embed.set_image(url=self.image_url)
 
         try:
             await webhook.send(
                 content=message_content,
                 embed=embed,
-                avatar_url='https://cdn.discordapp.com/avatars/1230464176745480254/60f19e6cc4d3f65d2b3a544123770c99.webp'
+                avatar_url=self.avatar_url
             )
             logging.info(f"Отправил приветственное сообщение для {member.name}.")
         except Exception as e:
             logging.error(f"Не удалось отправить приветственное сообщение для {member.name}: {e}")
 
     async def send_farewell_message(self, member, webhook):
-        """Отправляет сообщение через вебхук, когда участник выходит с сервера."""
         guild = member.guild
         message_content = f"{member.name} покинул сервер {guild.name}."
         embed = discord.Embed(
@@ -46,25 +45,23 @@ class Events(commands.Cog):
             description=f"{member.name} больше не с нами."
         )
 
-        # Добавляем иконку сервера, если она есть
         guild_icon_url = guild.icon.url if guild.icon else None
         if guild_icon_url:
             embed.set_thumbnail(url=guild_icon_url)
 
-        embed.set_image(url="https://media.tenor.com/9yR2nTbu3_0AAAAM/goodbye.gif")
+        # Удалил строку с gif_url
 
         try:
             await webhook.send(
                 content=message_content,
                 embed=embed,
-                avatar_url='https://cdn.discordapp.com/avatars/1230464176745480254/60f19e6cc4d3f65d2b3a544123770c99.webp'
+                avatar_url=self.avatar_url
             )
             logging.info(f"Отправил сообщение об уходе {member.name}.")
         except Exception as e:
             logging.error(f"Не удалось отправить сообщение об уходе для {member.name}: {e}")
 
     async def create_webhook_and_send_message(self, channel, member, message_func):
-        """Упрощает создание вебхука и отправку сообщений."""
         try:
             webhook = await channel.create_webhook(name="Void Sentinel")
             logging.info(f'Webhook создан в канале: {channel.name}')
@@ -100,4 +97,6 @@ class Events(commands.Cog):
             logging.error(f"Нет доступного текстового канала на сервере {guild.name} для отправки сообщения об уходе.")
 
 async def setup(bot):
-    await bot.add_cog(Events(bot))
+    from config import load_config
+    config = load_config()
+    await bot.add_cog(Events(bot, config["AVATAR_URL"], config["IMAGE_URL"]))

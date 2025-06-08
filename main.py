@@ -5,50 +5,52 @@ from discord import Intents
 from config import load_config
 from logging_setup import setup_logging
 
-# Настройка логирования
-setup_logging()
+def create_bot():
+    intents = Intents.default()
+    intents.members = True
+    intents.message_content = True
+    return commands.Bot(command_prefix='/', intents=intents)
 
-# Загрузка конфигурации
-DISCORD_TOKEN, GUILD_ID, CHANNEL_ID, WEBHOOK_URL, GIF_URL, IMAGE_URL, AVATAR_URL = load_config()
-if not DISCORD_TOKEN:
-    raise ValueError("❌ Discord токен не найден в конфигурации.")
-
-# Интенты
-intents = Intents.default()
-intents.members = True
-intents.message_content = True
-
-# Экземпляр бота
-bot = commands.Bot(command_prefix='/', intents=intents)
-
-# Загрузка cogs
-async def load_cogs():
+async def load_cogs(bot):
     cogs = [
         "cogs.events",
-        "cogs.commands",
+        "cogs.general",         # 🔄 Было: commands
         "cogs.duel",
         "cogs.clan_info",
+        "cogs.admin"     # 🆕 Новый Cog с командой изгнания
     ]
+
+    errors = []
     for cog in cogs:
         try:
             await bot.load_extension(cog)
-            logging.info(f"✅ Загружен cog: {cog}")
         except Exception as e:
-            logging.error(f"⚠️ Ошибка при загрузке cog {cog}: {e}")
+            errors.append((cog, str(e)))
 
-@bot.event
-async def on_ready():
-    logging.info(f"✅ Бот {bot.user} успешно запущен (ID: {bot.user.id})")
+    if not errors:
+        logging.info("✅ Все модули (cogs) успешно загружены и работают.")
+    else:
+        for cog, error in errors:
+            logging.error(f"⚠️ Ошибка при загрузке модуля {cog}: {error}")
 
-# Основная функция
 async def main():
-    logging.info("🚀 Запуск бота...")
-    async with bot:
-        await load_cogs()
-        await bot.start(DISCORD_TOKEN)
-    logging.info("🛑 Бот завершил работу.")
+    setup_logging()
+    config = load_config()
 
-# Запуск
+    if not config.get("DISCORD_TOKEN"):
+        raise ValueError("❌ Discord токен не найден в конфигурации.")
+
+    bot = create_bot()
+
+    @bot.event
+    async def on_ready():
+        logging.info(f"✅ Бот {bot.user} успешно запущен (ID: {bot.user.id})")
+        for guild in bot.guilds:
+            logging.info(f"🛡 Подключён к серверу: {guild.name} (ID: {guild.id}) | Участников: {guild.member_count}")
+
+    await load_cogs(bot)
+    await bot.start(config["DISCORD_TOKEN"])
+
 if __name__ == "__main__":
     try:
         asyncio.run(main())

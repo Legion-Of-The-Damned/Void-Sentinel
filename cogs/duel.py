@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.ui import Button, View
+from discord import app_commands
 import json
 import os
 
@@ -31,10 +32,6 @@ class Duel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        print("⚔️ Duel Cog загружен.")
-
     @commands.hybrid_command(name="дуэль", description="Вызвать пользователя на дуэль")
     async def duel(self, ctx: commands.Context, user: discord.Member, game: str, time: str):
         challenger = ctx.author
@@ -43,27 +40,21 @@ class Duel(commands.Cog):
 
         embed = discord.Embed(
             title="⚔️ Дуэль вызвана!",
-            description=(
-                f"{challenger.mention} вызвал {opponent.mention} на дуэль!\n"
-                f"**Игра**: {game}\n"
-                f"**Время**: {time}\n"
-                f"{opponent.mention}, примете ли вы вызов?"
-            ),
+            description=(f"{challenger.mention} вызвал {opponent.mention} на дуэль!\n"
+                         f"**Игра**: {game}\n"
+                         f"**Время**: {time}\n"
+                         f"{opponent.mention}, примете ли вы вызов?"),
             color=discord.Color.dark_red()
         )
-        embed.set_image(url="https://media.tenor.com/BBZ3h5r8OtMAAAAC/duel.gif")
 
         view = AcceptDuelView(challenger, opponent, duel_channel, self.bot)
         await ctx.send(embed=embed, view=view)
 
     @commands.hybrid_command(name="победа", description="Присудить победу участнику дуэли")
     async def assign_winner(self, ctx: commands.Context, winner: discord.Member):
-        duel_id = next(
-            (k for k, v in active_duels.items() if winner.id in (v["challenger"].id, v["opponent"].id)),
-            None
-        )
+        duel_id = next((k for k, v in active_duels.items() if winner.id in (v["challenger"].id, v["opponent"].id)), None)
         if not duel_id:
-            return await ctx.send("Этот участник не участвовал в активной дуэли.", ephemeral=True)
+            return await ctx.send("Этот участник не участвовал в активной дуэли.")
 
         duel = active_duels.pop(duel_id)
         loser = duel["opponent"] if winner == duel["challenger"] else duel["challenger"]
@@ -81,6 +72,40 @@ class Duel(commands.Cog):
             f"Поражения: {user_stats['losses']}"
         )
 
+    @app_commands.command(name="общая_статистика", description="Показать статистику по всем участникам")
+    async def all_stats(self, interaction: discord.Interaction):
+        stats_data = load_stats()
+        if not stats_data:
+            await interaction.response.send_message("📉 Пока нет данных о боях.")
+            return
+
+        guild = interaction.guild
+        stats_list = []
+        for user_id_str, stats in stats_data.items():
+            user_id = int(user_id_str)
+            member = guild.get_member(user_id)
+            name = member.display_name if member else f"Пользователь {user_id}"
+            wins = stats.get("wins", 0)
+            losses = stats.get("losses", 0)
+            total = wins + losses
+            stats_list.append((name, wins, losses, total))
+
+        stats_list.sort(key=lambda x: x[1], reverse=True)
+
+        lines = ["**🏆 Общая статистика дуэлей:**\n"]
+        for i, (name, wins, losses, total) in enumerate(stats_list, start=1):
+            lines.append(f"`{i}.` **{name}** — 🟢 Побед: `{wins}`, 🔴 Поражений: `{losses}`, ⚔ Всего: `{total}`")
+
+        embed = discord.Embed(
+            title="📊 Статистика дуэлей",
+            description="\n".join(lines),
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text=f"Запрошено: {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
+        embed.timestamp = discord.utils.utcnow()
+
+        await interaction.response.send_message(embed=embed)
+
 class AcceptDuelView(View):
     def __init__(self, challenger, opponent, duel_channel, bot):
         super().__init__(timeout=None)
@@ -88,7 +113,6 @@ class AcceptDuelView(View):
         self.opponent = opponent
         self.duel_channel = duel_channel
         self.bot = bot
-
         self.add_item(self.AcceptButton(self))
         self.add_item(self.DeclineButton(self))
 
@@ -114,14 +138,9 @@ class AcceptDuelView(View):
 
             embed = discord.Embed(
                 title="⚔️ Голосование началось!",
-                description=(
-                    f"Кто победит?\n\n"
-                    f"🟥 {self.parent.challenger.mention}\n"
-                    f"🟦 {self.parent.opponent.mention}"
-                ),
+                description=(f"Кто победит?\n\n🟥 {self.parent.challenger.mention}\n🟦 {self.parent.opponent.mention}"),
                 color=discord.Color.gold()
             )
-            embed.set_image(url="https://media.tenor.com/BBZ3h5r8OtMAAAAC/duel.gif")
 
             webhook = await self.parent.duel_channel.create_webhook(name="Duel Voting")
             view = VotingView(
@@ -152,7 +171,7 @@ class VotingView(View):
         self.challenger = challenger
         self.opponent = opponent
         self.votes = {"challenger": 0, "opponent": 0}
-        self.voters = {}  # user_id -> "challenger" or "opponent"
+        self.voters = {}
         self.webhook = webhook
 
         self.add_item(self.VoteButton("🟥 Голосовать за", self.challenger, "challenger"))
@@ -165,24 +184,19 @@ class VotingView(View):
             self.vote_key = vote_key
 
         async def callback(self, interaction: discord.Interaction):
+            parent_view: VotingView = self.view
             if interaction.user.bot:
                 return await interaction.response.defer()
 
-            parent_view: VotingView = self.view
-
-            # Prevent duelists from voting
             if interaction.user in [parent_view.challenger, parent_view.opponent]:
                 return await interaction.response.send_message("Вы не можете голосовать в своей дуэли!", ephemeral=True)
 
-            # Prevent double voting
             if interaction.user.id in parent_view.voters:
                 return await interaction.response.send_message("Вы уже проголосовали!", ephemeral=True)
 
             parent_view.voters[interaction.user.id] = self.vote_key
             parent_view.votes[self.vote_key] += 1
-            await interaction.response.send_message(
-                f"Вы проголосовали за {self.member.mention}!", ephemeral=True
-            )
+            await interaction.response.send_message(f"Вы проголосовали за {self.member.mention}!", ephemeral=True)
 
     async def on_timeout(self):
         winner = (
@@ -193,14 +207,10 @@ class VotingView(View):
 
         embed = discord.Embed(
             title="⚔️ Итоги голосования",
-            description=(
-                f"Победитель голосования: {winner.mention}!" if winner
-                else "Ничья! Голоса разделились поровну."
-            ),
+            description=(f"Победитель голосования: {winner.mention}!" if winner else "Ничья! Голоса разделились поровну."),
             color=discord.Color.green()
         )
 
-        # Формируем списки проголосовавших
         challenger_voters = [mention_user(uid) for uid, vote in self.voters.items() if vote == "challenger"]
         opponent_voters = [mention_user(uid) for uid, vote in self.voters.items() if vote == "opponent"]
 
@@ -210,7 +220,6 @@ class VotingView(View):
         await self.webhook.send(embed=embed)
 
 def mention_user(user_id):
-    """Преобразует ID пользователя в упоминание."""
     return f"<@{user_id}>"
 
 async def setup(bot: commands.Bot):
