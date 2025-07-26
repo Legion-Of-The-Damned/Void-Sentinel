@@ -19,7 +19,7 @@ class GeneralCommands(commands.Cog):
                 logging.error(f"❌ Ошибка при синхронизации команд: {e}")
 
         try:
-            await self.bot.change_presence(activity=discord.Game(name="⚔️ На страже легиона"))
+            await self.bot.change_presence(activity=discord.Game(name="Идут техработы"))
         except Exception as e:
             logging.warning(f"⚠️ Не удалось изменить статус: {e}")
 

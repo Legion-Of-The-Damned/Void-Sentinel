@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from discord.ui import Button, View
+from discord.ui import Button, View, Select
 from discord import app_commands
 import json
 import os
@@ -32,6 +32,14 @@ class Duel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.hybrid_command(name="победа", description="Выбрать дуэль и присудить победу")
+    async def assign_winner_select(self, ctx: commands.Context):
+        if not active_duels:
+            return await ctx.send("Нет активных дуэлей.")
+
+        view = DuelSelectionView(ctx)
+        await ctx.send("Выберите дуэль, чтобы назначить победителя:", view=view, ephemeral=True)
+
     @commands.hybrid_command(name="дуэль", description="Вызвать пользователя на дуэль")
     async def duel(self, ctx: commands.Context, user: discord.Member, game: str, time: str):
         challenger = ctx.author
@@ -50,17 +58,28 @@ class Duel(commands.Cog):
         view = AcceptDuelView(challenger, opponent, duel_channel, self.bot)
         await ctx.send(embed=embed, view=view)
 
-    @commands.hybrid_command(name="победа", description="Присудить победу участнику дуэли")
-    async def assign_winner(self, ctx: commands.Context, winner: discord.Member):
-        duel_id = next((k for k, v in active_duels.items() if winner.id in (v["challenger"].id, v["opponent"].id)), None)
-        if not duel_id:
-            return await ctx.send("Этот участник не участвовал в активной дуэли.")
+        # 📨 Попытка отправить ЛС вызванному
+        try:
+            dm_embed = discord.Embed(
+                title="📬 Тебя вызвали на дуэль!",
+                description=(
+                    f"Тебя вызвал на дуэль: **{challenger.display_name}**\n"
+                    f"**Игра:** {game}\n"
+                    f"**Время:** {time}\n"
+                    f"Место дуэли: {duel_channel.mention}\n\n"
+                    f"Прими или отклони вызов прямо в чате!"
+                ),
+                color=discord.Color.orange()
+            )
+            dm_embed.set_footer(text="Не забудь заглянуть в чат и принять решение ⚔️")
 
-        duel = active_duels.pop(duel_id)
-        loser = duel["opponent"] if winner == duel["challenger"] else duel["challenger"]
-        update_stats(winner.id, loser.id)
+            await opponent.send(embed=dm_embed)
 
-        await ctx.send(f"🎉 Победитель дуэли: {winner.mention}! Проигравший: {loser.mention}.")
+        except discord.Forbidden:
+            await ctx.send(
+                f"⚠️ {opponent.mention}, я не смог отправить тебе ЛС. Проверь настройки приватности.",
+                ephemeral=True
+            )
 
     @commands.hybrid_command(name="статистика", description="Показать статистику участника")
     async def stats(self, ctx: commands.Context, user: discord.Member):
@@ -217,10 +236,71 @@ class VotingView(View):
         embed.add_field(name="🟥 За", value="\n".join(challenger_voters) or "Нет", inline=True)
         embed.add_field(name="🟦 За", value="\n".join(opponent_voters) or "Нет", inline=True)
 
-        await self.webhook.send(embed=embed)
+        try:
+            await self.webhook.send(embed=embed)
+        except discord.NotFound:
+            pass  # Вебхук уже удалён или недоступен
 
-def mention_user(user_id):
-    return f"<@{user_id}>"
+        try:
+            await self.webhook.delete()
+        except discord.NotFound:
+            pass
+
+class DuelSelectionView(View):
+    def __init__(self, ctx):
+        super().__init__(timeout=60)
+        self.ctx = ctx
+        self.select = Select(placeholder="Выберите дуэль", min_values=1, max_values=1)
+        for duel_id, duel in active_duels.items():
+            challenger = duel["challenger"]
+            opponent = duel["opponent"]
+            label = f"{challenger.display_name} vs {opponent.display_name}"
+            self.select.add_option(label=label, value=duel_id)
+        self.select.callback = self.duel_selected
+        self.add_item(self.select)
+
+    async def duel_selected(self, interaction: discord.Interaction):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("Только инициатор может выбрать дуэль.", ephemeral=True)
+
+        duel_id = self.select.values[0]
+        duel = active_duels.get(duel_id)
+        if not duel:
+            return await interaction.response.send_message("Дуэль не найдена.", ephemeral=True)
+
+        await interaction.response.send_message(
+            f"Выбрана дуэль между {duel['challenger'].mention} и {duel['opponent'].mention}.\n"
+            f"Кто победил?",
+            view=WinnerButtonsView(duel_id),
+            ephemeral=True
+        )
+
+class WinnerButtonsView(View):
+    def __init__(self, duel_id):
+        super().__init__(timeout=30)
+        self.duel_id = duel_id
+        duel = active_duels.get(duel_id)
+        self.add_item(self.WinnerButton(duel_id, duel["challenger"], label="Победил Challenger 🟥"))
+        self.add_item(self.WinnerButton(duel_id, duel["opponent"], label="Победил Opponent 🟦"))
+
+    class WinnerButton(Button):
+        def __init__(self, duel_id, winner, label):
+            super().__init__(label=label, style=discord.ButtonStyle.success)
+            self.duel_id = duel_id
+            self.winner = winner
+
+        async def callback(self, interaction: discord.Interaction):
+            duel = active_duels.pop(self.duel_id, None)
+            if not duel:
+                return await interaction.response.send_message("Дуэль уже завершена.", ephemeral=True)
+
+            loser = duel["opponent"] if self.winner == duel["challenger"] else duel["challenger"]
+            update_stats(self.winner.id, loser.id)
+
+            await interaction.response.send_message(
+                f"🎉 Победитель: {self.winner.mention}!\nПроигравший: {loser.mention}.",
+                ephemeral=False
+            )
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Duel(bot))
