@@ -32,8 +32,12 @@ class Duel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="победа", description="Выбрать дуэль и присудить победу")
+    @commands.hybrid_command(name="победа", description="Выбрать дуэль и присудить победу (только для админов)")
     async def assign_winner_select(self, ctx: commands.Context):
+    # Проверка на право кикать участников
+        if not ctx.author.guild_permissions.kick_members:
+            return await ctx.send("❌ У вас нет прав для назначения победителя. Необходимы права на кик участников.", ephemeral=True)
+
         if not active_duels:
             return await ctx.send("Нет активных дуэлей.")
 
