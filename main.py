@@ -19,7 +19,6 @@ async def load_cogs(bot: commands.Bot):
         "cogs.events",
         "cogs.general",       # Команды общего назначения
         "cogs.duel",          # Система дуэлей
-        "cogs.music_cog",     # Музыкальный модуль
         "cogs.clan_info",     # Информация о клане
         "cogs.admin",         # Админ-команды
     ]
