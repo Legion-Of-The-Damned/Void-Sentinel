@@ -1,13 +1,14 @@
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 
 class ColorFormatter(logging.Formatter):
     COLORS = {
-        'DEBUG': '\033[90m',    # Серый
-        'INFO': '\033[94m',     # Синий
-        'WARNING': '\033[93m',  # Жёлтый
-        'ERROR': '\033[91m',    # Красный
-        'CRITICAL': '\033[1;91m', # Жирный красный
+        'DEBUG': '\033[90m',     # Серый
+        'INFO': '\033[94m',      # Синий
+        'WARNING': '\033[93m',   # Жёлтый
+        'ERROR': '\033[91m',     # Красный
+        'CRITICAL': '\033[1;91m',# Жирный красный
         'RESET': '\033[0m',
     }
 
@@ -33,20 +34,22 @@ def setup_logging(log_level=logging.INFO):
     log_format = "%(asctime)s | %(levelname)-8s | %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    # Файл для всех логов
-    file_handler = logging.FileHandler("bot.log", mode='a', encoding='utf-8')
+    # 📦 Ротация логов: 5 МБ на файл, до 3 архивов
+    file_handler = RotatingFileHandler(
+        "bot.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8'
+    )
     file_formatter = logging.Formatter(log_format, datefmt=date_format)
     file_handler.setFormatter(file_formatter)
 
-    # Получаем корневой логгер
+    # 🌲 Корневой логгер
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
-    root_logger.handlers.clear()  # Убираем все обработчики
+    root_logger.handlers.clear()
 
-    # Добавляем файловый обработчик (без цвета)
+    # ➕ Добавляем файловый логгер
     root_logger.addHandler(file_handler)
 
-    # Добавляем консольный обработчик с цветом для основного логгера
+    # 🎨 Консольный логгер с цветом
     console_handler = logging.StreamHandler(sys.stdout)
     try:
         console_handler.stream.reconfigure(encoding='utf-8')
@@ -55,12 +58,12 @@ def setup_logging(log_level=logging.INFO):
     console_handler.setFormatter(ColorFormatter(log_format, datefmt=date_format))
     root_logger.addHandler(console_handler)
 
-    # Отдельный логгер для discord с кастомным форматтером и без дублирования
+    # 🪵 Специальный логгер для Discord
     discord_logger = logging.getLogger("discord")
     discord_logger.setLevel(log_level)
-    discord_logger.propagate = False  # чтобы не уходили в root_logger
-
+    discord_logger.propagate = False
     discord_logger.handlers.clear()
+
     discord_handler = logging.StreamHandler(sys.stdout)
     try:
         discord_handler.stream.reconfigure(encoding='utf-8')
