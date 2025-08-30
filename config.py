@@ -1,32 +1,15 @@
+import os
+
 def load_config():
     return {
-        "DISCORD_TOKEN": "MTIzMDQ2NDE3Njc0NTQ4MDI1NA.GfO0Zk.yCr2o3B0zEpWoDfiXaFcdSBCakVp17otLitjhA",
-        "GUILD_ID": 828749346505490503,
-        "CHANNEL_ID": 1368377367369748480,
-        "WEBHOOK_URL": "https://discord.com/api/webhooks/1411065181471113296/1M3JYVG3jJBvECaHBw4EgbBwYc8I3jtUp7eLjUEmB13pyO2JVGtgyRBrOIL9_ocnbwK4",
-        "IMAGE_URL": "https://cdn.discordapp.com/attachments/1355929392072753262/1370486966977691689/ChatGPT_Image_9_._2025_._22_45_29.png?ex=683ff9b3&is=683ea833&hm=08522e2f602705a6716af9e1e571ea68c7167a117a8574460005433e00af2720&",
-        "AVATAR_URL": "https://cdn.discordapp.com/attachments/1355929392072753262/1367553212474982420/Void_Sentinel.jpg?ex=683fd96d&is=683e87ed&hm=1d610b53e9f0bdcf99c3ad8f0803f50d731addb174511ec044727b0a59adace3&",
-        "CLAN_ROLE_NAMES": ["💀Легион Проклятых🔥"],
-        "CLAN_ROLE_IDS": [
-            1151988594148376709, 1347143491641151561, 1362367466390683859,
-            1248311771177947156, 1279150825998127134, 1240220163744337920
-        ],
-        "FRIEND_ROLE_ID": 1151988812151521431,
+        "DISCORD_TOKEN": os.getenv("DISCORD_TOKEN"),
+        "GUILD_ID": int(os.getenv("GUILD_ID", 0)),
+        "CHANNEL_ID": int(os.getenv("CHANNEL_ID", 0)),
+        "WEBHOOK_URL": os.getenv("WEBHOOK_URL"),
+        "IMAGE_URL": os.getenv("IMAGE_URL", ""),  # можно оставить в коде, если не секрет
+        "AVATAR_URL": os.getenv("AVATAR_URL", ""),
+        "CLAN_ROLE_NAMES": os.getenv("CLAN_ROLE_NAMES", "💀Легион Проклятых🔥").split(","),
+        "CLAN_ROLE_IDS": [int(x) for x in os.getenv("CLAN_ROLE_IDS", "").split(",") if x],
+        "FRIEND_ROLE_ID": int(os.getenv("FRIEND_ROLE_ID", 0)),
+        "GITHUB_TOKEN": os.getenv("GITHUB_TOKEN"),
     }
-
-    CLAN_ROLE_NAMES = [
-        "💀Легион Проклятых🔥",
-    ]
-
-    CLAN_ROLE_IDS = [
-        1151988594148376709, 1347143491641151561, 1362367466390683859,
-        1248311771177947156, 1279150825998127134, 1240220163744337920,
-        1240220163744337920,
-    ]
-    FRIEND_ROLE_ID = 1151988812151521431
-
-    return (
-        DISCORD_TOKEN, GUILD_ID, CHANNEL_ID, WEBHOOK_URL,
-        IMAGE_URL, AVATAR_URL, CLAN_ROLE_NAMES,
-        CLAN_ROLE_IDS, FRIEND_ROLE_ID
-    )
