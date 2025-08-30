@@ -23,6 +23,8 @@ async def load_cogs(bot: commands.Bot):
         "cogs.voting",
         "cogs.coinflip",
         "cogs.music_cog",
+        "cogs.info",
+        "cogs.verification",
         "cogs.clan_info",
         "cogs.rps_cog",
         "cogs.admin",
