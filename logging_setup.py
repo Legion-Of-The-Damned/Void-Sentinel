@@ -1,14 +1,15 @@
 import logging
 import sys
+import os
 from logging.handlers import RotatingFileHandler
 
 class ColorFormatter(logging.Formatter):
     COLORS = {
-        'DEBUG': '\033[90m',     # Серый
-        'INFO': '\033[94m',      # Синий
-        'WARNING': '\033[93m',   # Жёлтый
-        'ERROR': '\033[91m',     # Красный
-        'CRITICAL': '\033[1;91m',# Жирный красный
+        'DEBUG': '\033[90m',      # Серый
+        'INFO': '\033[94m',       # Синий
+        'WARNING': '\033[93m',    # Жёлтый
+        'ERROR': '\033[91m',      # Красный
+        'CRITICAL': '\033[1;91m', # Жирный красный
         'RESET': '\033[0m',
     }
 
@@ -34,9 +35,12 @@ def setup_logging(log_level=logging.INFO):
     log_format = "%(asctime)s | %(levelname)-8s | %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    # 📦 Ротация логов: 5 МБ на файл, до 3 архивов
+    # Создаем папку logs, если нет
+    os.makedirs("logs", exist_ok=True)
+
+    # 📦 Ротация логов: 5 МБ на файл, до 3 архивов, файл в папке logs
     file_handler = RotatingFileHandler(
-        "bot.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8'
+        "logs/bot.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8'
     )
     file_formatter = logging.Formatter(log_format, datefmt=date_format)
     file_handler.setFormatter(file_formatter)
