@@ -17,14 +17,25 @@ def create_bot() -> commands.Bot:
 async def load_cogs(bot: commands.Bot):
     cogs = [
         "cogs.events",
-        "cogs.general",       # Команды общего назначения
-        "cogs.duel",          # Система дуэлей
-        "cogs.clan_info",     # Информация о клане
-        "cogs.admin",         # Админ-команды
+        "cogs.general",
+        "cogs.duel",
+        "cogs.quiz",
+        "cogs.voting",
+        "cogs.coinflip",
+        "cogs.music_cog",
+        "cogs.info",
+        "cogs.verification",
+        "cogs.clan_info",
+        "cogs.rps_cog",
+        "cogs.admin",
+        "cogs.clan_general",  # убедись, что загружаешь только один раз
     ]
 
     errors = []
     for cog in cogs:
+        if cog in bot.extensions:
+            logging.info(f"Ког {cog} уже загружен, пропускаем")
+            continue
         try:
             await bot.load_extension(cog)
         except Exception as e:
@@ -35,7 +46,6 @@ async def load_cogs(bot: commands.Bot):
             logging.error(f"⚠️ Ошибка при загрузке модуля `{cog}`: {error}")
     else:
         logging.info("✅ Все модули успешно загружены.")
-
 
 async def main():
     setup_logging()

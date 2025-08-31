@@ -4,12 +4,25 @@ import traceback
 from discord import app_commands
 from discord.ext import commands
 from datetime import timedelta
+from discord.ui import Select, View
+from data import active_duels, save_active_duels, update_stats  # убедись, что есть эти функции/данные
 
-class ClanGeneral(commands.Cog):
+class Admin(commands.Cog):
     def __init__(self, bot: commands.Bot, clan_role_ids: list[int], friend_role_id: int):
         self.bot = bot
         self.clan_role_ids = clan_role_ids
         self.friend_role_id = friend_role_id
+
+    @commands.hybrid_command(name="победа", description="Выбрать дуэль и присудить победу (только для админов)")
+    async def assign_winner_select(self, ctx: commands.Context):
+        if not ctx.author.guild_permissions.kick_members:
+            return await ctx.send("❌ У вас нет прав для назначения победителя. Необходимы права на кик участников.", ephemeral=True)
+
+        if not active_duels:
+            return await ctx.send("Нет активных дуэлей.", ephemeral=True)
+
+        view = DuelSelectionView(ctx)
+        await ctx.send("Выберите дуэль, чтобы назначить победителя:", view=view, ephemeral=True)
 
     @app_commands.command(name="изгнание", description="Изгоняет члена из клана и назначает роль 'Друг клана'")
     async def banish(self, interaction: discord.Interaction, member: discord.Member):
@@ -54,7 +67,6 @@ class ClanGeneral(commands.Cog):
             return
 
         try:
-            # Попытка отправить ЛС перед баном
             try:
                 await member.send(
                     f"Ты был **забанен** на сервере **{interaction.guild.name}**.\n"
@@ -125,7 +137,6 @@ class ClanGeneral(commands.Cog):
             return
 
         try:
-            # Попытка отправить ЛС перед киком
             try:
                 await member.send(
                     f"Ты был кикнут с сервера **{interaction.guild.name}**.\n"
@@ -149,7 +160,6 @@ class ClanGeneral(commands.Cog):
         try:
             duration = timedelta(minutes=minutes)
 
-            # Попытка отправить ЛС перед мутом
             try:
                 await member.send(
                     f"Ты получил мут на **{minutes} минут** на сервере **{interaction.guild.name}**.\n"
@@ -173,7 +183,6 @@ class ClanGeneral(commands.Cog):
         try:
             await member.timeout(None, reason=f"Размут модератором {interaction.user}")
 
-            # Попытка отправить ЛС после размута
             try:
                 await member.send(
                     f"Ты был размучен на сервере **{interaction.guild.name}**.\n"
@@ -187,7 +196,80 @@ class ClanGeneral(commands.Cog):
             logging.error(f"❌ Ошибка при размуте: {e}")
             await interaction.response.send_message("❌ Не удалось снять мут.", ephemeral=True)
 
+
+# Дополнительные классы для команды /победа
+
+class DuelSelectionView(View):
+    def __init__(self, ctx):
+        super().__init__(timeout=60)
+        self.ctx = ctx
+        self.select = Select(placeholder="Выберите дуэль", min_values=1, max_values=1)
+        for duel_id, duel in active_duels.items():
+            guild = ctx.guild
+            challenger = guild.get_member(duel["challenger_id"])
+            opponent = guild.get_member(duel["opponent_id"])
+            if challenger and opponent:
+                label = f"{challenger.display_name} vs {opponent.display_name}"
+                self.select.add_option(label=label, value=duel_id)
+        self.select.callback = self.duel_selected
+        self.add_item(self.select)
+
+    async def duel_selected(self, interaction: discord.Interaction):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("Только инициатор может выбрать дуэль.", ephemeral=True)
+
+        duel_id = self.select.values[0]
+        duel = active_duels.get(duel_id)
+        if not duel:
+            return await interaction.response.send_message("Дуэль не найдена.", ephemeral=True)
+
+        guild = interaction.guild
+        challenger = guild.get_member(duel["challenger_id"])
+        opponent = guild.get_member(duel["opponent_id"])
+
+        await interaction.response.send_message(
+            f"Выбрана дуэль между {challenger.mention} и {opponent.mention}.\nКто победил?",
+            view=WinnerButtonsView(duel_id),
+            ephemeral=True
+        )
+
+
+class WinnerButtonsView(View):
+    def __init__(self, duel_id):
+        super().__init__(timeout=30)
+        self.duel_id = duel_id
+        duel = active_duels.get(duel_id)
+        self.challenger_id = duel["challenger_id"]
+        self.opponent_id = duel["opponent_id"]
+
+        self.add_item(self.WinnerButton(duel_id, self.challenger_id, label="Победил Challenger 🟥"))
+        self.add_item(self.WinnerButton(duel_id, self.opponent_id, label="Победил Opponent 🟦"))
+
+    class WinnerButton(discord.ui.Button):
+        def __init__(self, duel_id, winner_id, label):
+            super().__init__(label=label, style=discord.ButtonStyle.success)
+            self.duel_id = duel_id
+            self.winner_id = winner_id
+
+        async def callback(self, interaction: discord.Interaction):
+            duel = active_duels.pop(self.duel_id, None)
+            if not duel:
+                return await interaction.response.send_message("Дуэль уже завершена.", ephemeral=True)
+
+            loser_id = duel["opponent_id"] if self.winner_id == duel["challenger_id"] else duel["challenger_id"]
+            update_stats(self.winner_id, loser_id)
+            await save_active_duels()
+
+            winner = interaction.guild.get_member(self.winner_id)
+            loser = interaction.guild.get_member(loser_id)
+
+            await interaction.response.send_message(
+                f"🎉 Победитель: {winner.mention if winner else self.winner_id}!\nПроигравший: {loser.mention if loser else loser_id}.",
+                ephemeral=False
+            )
+
+
 async def setup(bot: commands.Bot):
     from config import load_config
     config = load_config()
-    await bot.add_cog(ClanGeneral(bot, config["CLAN_ROLE_IDS"], config["FRIEND_ROLE_ID"]))
+    await bot.add_cog(Admin(bot, config["CLAN_ROLE_IDS"], config["FRIEND_ROLE_ID"]))
