@@ -2,6 +2,9 @@ import discord
 import logging
 from discord.ext import commands
 
+# --- Настройка логгера для этого кога ---
+logger = logging.getLogger("EventsCog")
+
 class Events(commands.Cog):
     def __init__(self, bot, avatar_url, image_url):
         self.bot = bot
@@ -12,7 +15,7 @@ class Events(commands.Cog):
         guild = member.guild
         message_content = f"Добро пожаловать на сервер {guild.name}, {member.mention}!"
         embed = discord.Embed(
-            color=15597568,
+            color=0xEDC93D,
             title="Мы рады видеть тебя в нашем сообществе! Надеемся, что тебе здесь понравится!"
         )
 
@@ -32,9 +35,9 @@ class Events(commands.Cog):
                 embed=embed,
                 avatar_url=self.avatar_url
             )
-            logging.info(f"Отправил приветственное сообщение для {member.name}.")
+            logger.info(f"✅ Отправлено приветственное сообщение для {member} ({member.id})")
         except Exception as e:
-            logging.error(f"Не удалось отправить приветственное сообщение для {member.name}: {e}")
+            logger.error(f"❌ Не удалось отправить приветственное сообщение для {member} ({member.id}): {e}")
 
     async def send_farewell_message(self, member, webhook):
         guild = member.guild
@@ -49,26 +52,25 @@ class Events(commands.Cog):
         if guild_icon_url:
             embed.set_thumbnail(url=guild_icon_url)
 
-        # Удалил строку с gif_url
-
         try:
             await webhook.send(
                 content=message_content,
                 embed=embed,
                 avatar_url=self.avatar_url
             )
-            logging.info(f"Отправил сообщение об уходе {member.name}.")
+            logger.info(f"✅ Отправлено сообщение об уходе {member} ({member.id})")
         except Exception as e:
-            logging.error(f"Не удалось отправить сообщение об уходе для {member.name}: {e}")
+            logger.error(f"❌ Не удалось отправить сообщение об уходе для {member} ({member.id}): {e}")
 
     async def create_webhook_and_send_message(self, channel, member, message_func):
         try:
             webhook = await channel.create_webhook(name="Void Sentinel")
-            logging.info(f'Webhook создан в канале: {channel.name}')
+            logger.info(f"Webhook создан в канале: {channel.name} ({channel.id})")
             await message_func(member, webhook)
             await webhook.delete()
+            logger.info(f"Webhook удалён из канала: {channel.name} ({channel.id})")
         except Exception as e:
-            logging.error(f"Не удалось создать вебхук или отправить сообщение в канале {channel.name}: {e}")
+            logger.error(f"❌ Не удалось создать вебхук или отправить сообщение в канале {channel.name} ({channel.id}): {e}")
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -79,9 +81,10 @@ class Events(commands.Cog):
         )
 
         if welcome_channel:
+            logger.info(f"{member} ({member.id}) присоединился к серверу {guild.name}")
             await self.create_webhook_and_send_message(welcome_channel, member, self.send_welcome_message)
         else:
-            logging.error(f"Нет доступного текстового канала на сервере {guild.name} для отправки приветственного сообщения.")
+            logger.error(f"❌ Нет доступного канала на сервере {guild.name} для приветственного сообщения")
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
@@ -92,9 +95,10 @@ class Events(commands.Cog):
         )
 
         if farewell_channel:
+            logger.info(f"{member} ({member.id}) покинул сервер {guild.name}")
             await self.create_webhook_and_send_message(farewell_channel, member, self.send_farewell_message)
         else:
-            logging.error(f"Нет доступного текстового канала на сервере {guild.name} для отправки сообщения об уходе.")
+            logger.error(f"❌ Нет доступного канала на сервере {guild.name} для сообщения об уходе")
 
 async def setup(bot):
     from config import load_config

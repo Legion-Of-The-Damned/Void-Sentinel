@@ -1,6 +1,10 @@
 import discord
+import logging
 from discord.ext import commands
 import random
+
+# --- Настройка логгера для этого кога ---
+logger = logging.getLogger("CoinFlipCog")
 
 class CoinFlipButton(discord.ui.View):
     def __init__(self, challenger: discord.Member, opponent: discord.Member, bot, play_vs_bot=False, timeout=30):
@@ -11,9 +15,13 @@ class CoinFlipButton(discord.ui.View):
         self.choices = {}
         self.play_vs_bot = play_vs_bot
         self.result_msg = None
+        logger.info(f"Создана игра Монетка: {challenger} vs {opponent}")
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id == self.challenger.id
+        if interaction.user.id != self.challenger.id:
+            await interaction.response.send_message("❌ Только инициатор игры может делать выбор.", ephemeral=True)
+            return False
+        return True
 
     @discord.ui.button(label="Орёл", style=discord.ButtonStyle.primary, emoji="🦅")
     async def eagle(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -26,13 +34,17 @@ class CoinFlipButton(discord.ui.View):
     async def make_choice(self, interaction: discord.Interaction, choice: str):
         if self.challenger.id in self.choices:
             await interaction.response.send_message("❗ Ты уже сделал выбор.", ephemeral=True)
+            logger.warning(f"{interaction.user} попытался выбрать {choice} повторно")
             return
 
         self.choices[self.challenger.id] = choice
         await interaction.response.send_message(f"✅ Ты выбрал: **{choice}**", ephemeral=True)
+        logger.info(f"{interaction.user} выбрал {choice}")
 
         if self.play_vs_bot:
+            # Бот автоматически выбирает противоположное
             self.choices[self.bot.user.id] = "решка" if choice == "орёл" else "орёл"
+            logger.info(f"{self.bot.user} автоматически выбрал {self.choices[self.bot.user.id]}")
             await self.reveal_result()
         else:
             await interaction.followup.send(f"Ожидаем выбор от {self.opponent.mention}...", ephemeral=True)
@@ -56,13 +68,18 @@ class CoinFlipButton(discord.ui.View):
                 description += f"🤖 Побеждает {self.bot.user.mention}!"
             else:
                 description += f"🎉 Победил <@{winner}>!"
+            logger.info(f"Результат броска: {result}, победитель ID {winner}")
         else:
             description += "⚖️ Ничья! У обоих одинаковый выбор."
+            logger.info(f"Результат броска: {result}, ничья")
 
         embed = discord.Embed(title="🎲 Монетка: Орёл или Решка", description=description, color=0xFFD700)
         for child in self.children:
             child.disabled = True
-        await self.result_msg.edit(embed=embed, view=self)
+        try:
+            await self.result_msg.edit(embed=embed, view=self)
+        except Exception as e:
+            logger.error(f"Ошибка при отправке результата броска: {e}")
 
 class CoinFlip(commands.Cog):
     def __init__(self, bot):
@@ -74,10 +91,10 @@ class CoinFlip(commands.Cog):
 
         if opponent.id == ctx.author.id:
             await ctx.send("❌ Нельзя играть с самим собой.")
+            logger.warning(f"{ctx.author} попытался сыграть с самим собой")
             return
 
         play_vs_bot = opponent.bot
-
         view = CoinFlipButton(ctx.author, opponent, self.bot, play_vs_bot=play_vs_bot)
 
         title = "🪙 Монетка: Орёл или Решка!"
@@ -96,6 +113,7 @@ class CoinFlip(commands.Cog):
         embed = discord.Embed(title=title, description=description, color=0x00BFFF)
         msg = await ctx.send(embed=embed, view=view)
         view.result_msg = msg
+        logger.info(f"Игра создана: {ctx.author} vs {opponent}, сообщение {msg.id}")
 
 async def setup(bot):
     await bot.add_cog(CoinFlip(bot))

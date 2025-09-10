@@ -1,13 +1,15 @@
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 from discord.ui import View, Select, Button
 import random
 import aiohttp
 import json
+import logging
 from config import load_config
 
 CONFIG = load_config()
+logger = logging.getLogger("QuizCog")
 
 async def fetch_questions_from_github():
     url = f"https://raw.githubusercontent.com/{CONFIG['REPO_NAME']}/main/{CONFIG['QUIZ_QUESTIONS_PATH']}"
@@ -22,13 +24,14 @@ async def fetch_questions_from_github():
             if resp.status == 200:
                 try:
                     data = json.loads(raw_text)
-                    # Проверяем, что каждый вопрос содержит нужные поля
-                    return [q for q in data if all(k in q for k in ("category", "question", "options", "answer"))]
-                except json.JSONDecodeError:
-                    print("❌ Ошибка при разборе JSON.")
+                    valid_questions = [q for q in data if all(k in q for k in ("category", "question", "options", "answer"))]
+                    logger.info(f"✅ Загружено {len(valid_questions)} вопросов из GitHub")
+                    return valid_questions
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ Ошибка при разборе JSON: {e}")
                     return []
             else:
-                print(f"Ошибка загрузки с GitHub: {resp.status}")
+                logger.error(f"❌ Ошибка загрузки с GitHub: HTTP {resp.status}")
                 return []
 
 class QuizView(View):
@@ -36,7 +39,6 @@ class QuizView(View):
         super().__init__(timeout=None)
         self.question = question_data
         self.answered_users = set()
-
         for idx, option in enumerate(self.question['options'], start=1):
             button = Button(label=str(idx), style=discord.ButtonStyle.primary)
             button.callback = self.make_callback(idx)
@@ -47,14 +49,15 @@ class QuizView(View):
             if interaction.user.id in self.answered_users:
                 await interaction.response.send_message("Вы уже отвечали на этот вопрос.", ephemeral=True)
                 return
-
             self.answered_users.add(interaction.user.id)
             correct = self.question['answer']
             if idx == correct:
                 await interaction.response.send_message("🎉 Правильно!", ephemeral=True)
                 await interaction.channel.send(f"✅ {interaction.user.mention} дал правильный ответ!")
+                logger.info(f"{interaction.user} ответил правильно на вопрос: {self.question['question']}")
             else:
                 await interaction.response.send_message("❌ Неправильно.", ephemeral=True)
+                logger.info(f"{interaction.user} ответил неправильно на вопрос: {self.question['question']}")
         return callback
 
 class CategorySelect(Select):
@@ -68,6 +71,7 @@ class CategorySelect(Select):
         filtered = [q for q in self.questions if q['category'].lower() == selected_category.lower()]
         if not filtered:
             await interaction.response.send_message(f"❌ В категории `{selected_category}` нет вопросов.", ephemeral=True)
+            logger.warning(f"{interaction.user} выбрал пустую категорию: {selected_category}")
             return
 
         question = random.choice(filtered)
@@ -85,6 +89,7 @@ class CategorySelect(Select):
 
         view = QuizView(question)
         await interaction.response.send_message(embed=embed, view=view)
+        logger.info(f"{interaction.user} начал викторину в категории: {selected_category}")
 
 class CategoryView(View):
     def __init__(self, categories, questions):
@@ -100,11 +105,13 @@ class QuizCog(commands.Cog):
         questions = await fetch_questions_from_github()
         if not questions:
             await interaction.response.send_message("❌ Вопросы не найдены или повреждены.", ephemeral=True)
+            logger.error(f"{interaction.user} попытался запустить викторину, но вопросы не найдены")
             return
 
         categories = list({q['category'].lower() for q in questions})
         if not categories:
             await interaction.response.send_message("❌ Нет доступных категорий.", ephemeral=True)
+            logger.warning(f"{interaction.user} попытался запустить викторину, но категории отсутствуют")
             return
 
         embed = discord.Embed(
@@ -113,6 +120,7 @@ class QuizCog(commands.Cog):
             color=discord.Color.blurple()
         )
         await interaction.response.send_message(embed=embed, view=CategoryView(categories, questions), ephemeral=True)
+        logger.info(f"{interaction.user} открыл меню выбора категории для викторины")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(QuizCog(bot))

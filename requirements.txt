@@ -1,6 +1,4 @@
 discord.py
 PyNaCl
 PyGithub
-ytmusicapi
-ffmpeg
-yt_dlp
+python-dotenv
