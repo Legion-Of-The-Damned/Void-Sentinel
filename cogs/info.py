@@ -6,6 +6,10 @@ import requests
 import json
 from base64 import b64decode
 from config import load_config
+import logging
+
+# --- Логгер для InfoCog ---
+logger = logging.getLogger("InfoCog")
 
 CONFIG = load_config()
 
@@ -19,12 +23,18 @@ class Info(commands.Cog):
 
     def load_categories_from_github(self):
         """Загружаем JSON с категориями и их содержимым из GitHub."""
-        response = requests.get(GITHUB_API_URL, headers=HEADERS)
-        if response.status_code != 200:
-            return {}  # вернём пустой словарь, если что-то пошло не так
-        data = response.json()
-        content = b64decode(data['content']).decode('utf-8')
-        return json.loads(content)
+        try:
+            response = requests.get(GITHUB_API_URL, headers=HEADERS)
+            if response.status_code != 200:
+                logger.error(f"Ошибка загрузки данных с GitHub: статус {response.status_code}")
+                return {}
+            data = response.json()
+            content = b64decode(data['content']).decode('utf-8')
+            logger.info("Данные с GitHub успешно загружены")
+            return json.loads(content)
+        except Exception as e:
+            logger.error(f"❌ Исключение при загрузке данных с GitHub: {e}")
+            return {}
 
     @app_commands.command(name="информация_о_сервере", description="Показывает информацию о сервере с выбором категории")
     async def server_info(self, interaction: discord.Interaction):
@@ -41,6 +51,7 @@ class Info(commands.Cog):
         async def select_callback(select_interaction: discord.Interaction):
             if select_interaction.user != interaction.user:
                 await select_interaction.response.send_message("Это меню не для тебя!", ephemeral=True)
+                logger.warning(f"{select_interaction.user} попытался использовать чужое меню InfoCog")
                 return
 
             selected_category = select.values[0]
@@ -51,6 +62,7 @@ class Info(commands.Cog):
                 color=discord.Color.red()
             )
             await select_interaction.response.edit_message(embed=embed)
+            logger.info(f"{interaction.user} выбрал категорию '{selected_category}'")
 
         select = discord.ui.Select(placeholder="Выберите категорию", options=options)
         select.callback = select_callback
@@ -59,6 +71,7 @@ class Info(commands.Cog):
         view.add_item(select)
 
         await interaction.response.send_message("Выберите категорию информации о сервере:", view=view)
+        logger.info(f"{interaction.user} открыл меню информации о сервере")
 
 
 async def setup(bot: commands.Bot):

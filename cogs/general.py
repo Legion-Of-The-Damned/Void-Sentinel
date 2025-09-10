@@ -3,6 +3,9 @@ import logging
 from discord import app_commands
 from discord.ext import commands
 
+# --- Настройка логгера для этого кога ---
+logger = logging.getLogger("GeneralCog")
+
 class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -14,14 +17,15 @@ class GeneralCommands(commands.Cog):
             try:
                 await self.bot.tree.sync()
                 self.synced = True
-                logging.info("✅ Slash-команды успешно синхронизированы.")
+                logger.info("✅ Slash-команды успешно синхронизированы")
             except Exception as e:
-                logging.error(f"❌ Ошибка при синхронизации команд: {e}")
+                logger.error(f"❌ Ошибка при синхронизации команд: {e}")
 
         try:
             await self.bot.change_presence(activity=discord.Game(name="Идут тех-работы"))
+            logger.info("Статус бота успешно изменён")
         except Exception as e:
-            logging.warning(f"⚠️ Не удалось изменить статус: {e}")
+            logger.warning(f"⚠️ Не удалось изменить статус: {e}")
 
     @app_commands.command(name="помощь", description="Показывает список доступных команд")
     async def help_command(self, interaction: discord.Interaction):
@@ -66,6 +70,7 @@ class GeneralCommands(commands.Cog):
         )
         embed.set_image(url="https://cdn.discordapp.com/attachments/1355929392072753262/1355975277930348675/ChatGPT_Image_30_._2025_._21_11_52.png")
         await interaction.response.send_message(embed=embed)
+        logger.info(f"Пользователь {interaction.user} запросил справку по командам")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(GeneralCommands(bot))

@@ -3,15 +3,17 @@ from discord.ext import commands
 import json
 import os
 import aiohttp
-from config import load_config  # импортируем функцию load_config
+import logging
+import asyncio
+from config import load_config
 
 config = load_config()
+logger = logging.getLogger("Verification")
 
 
 class Verification(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Настройки верификации из конфига
         self.verify_channel_id = config.get("VERIFY_CHANNEL_ID")
         self.verified_role_id = config.get("VERIFIED_ROLE_ID")
         self.verify_emoji = config.get("VERIFY_EMOJI", "✅")
@@ -27,61 +29,60 @@ class Verification(commands.Cog):
                     if resp.status == 200:
                         return await resp.read()
         except Exception as e:
-            print(f"[Verification] Не удалось загрузить аватар: {e}")
+            logger.warning(f"Не удалось загрузить аватар: {e}")
         return None
 
     def save_message_id(self, msg_id):
         try:
+            os.makedirs(os.path.dirname(self.msg_file), exist_ok=True)
             with open(self.msg_file, "w") as f:
                 json.dump({"message_id": msg_id}, f)
+            logger.success(f"Сохранено сообщение верификации с ID {msg_id}")
         except Exception as e:
-            print(f"[Verification] Ошибка при сохранении message_id: {e}")
+            logger.error(f"Ошибка при сохранении message_id: {e}")
 
     def load_message_id(self):
         if os.path.exists(self.msg_file):
             try:
-                with open(self.msg_file, "r") as f:
-                    return json.load(f).get("message_id")
+                return json.load(open(self.msg_file, "r")).get("message_id")
             except Exception as e:
-                print(f"[Verification] Ошибка при чтении message_id: {e}")
+                logger.error(f"Ошибка при чтении message_id: {e}")
         return None
 
     @commands.Cog.listener()
     async def on_ready(self):
         channel = self.bot.get_channel(self.verify_channel_id)
         if not channel:
-            print(f"[Verification] Канал с ID {self.verify_channel_id} не найден!")
+            logger.warning(f"Канал с ID {self.verify_channel_id} не найден!")
             return
 
         msg_id = self.load_message_id()
         if msg_id:
             try:
                 await channel.fetch_message(msg_id)
-                print("[Verification] Сообщение верификации найдено, создание не требуется.")
+                logger.success("Сообщение верификации найдено, создание не требуется.")
                 return
             except discord.NotFound:
-                print("[Verification] Сообщение было удалено, создаём новое.")
+                logger.success("Сообщение было удалено, создаём новое.")
             except Exception as e:
-                print(f"[Verification] Ошибка при получении сообщения: {e}")
+                logger.error(f"Ошибка при получении сообщения: {e}")
                 msg_id = None
 
-        # Создаём сообщение через вебхук, если его нет
+        # Создание нового сообщения через вебхук
         try:
             webhooks = await channel.webhooks()
             avatar_bytes = await self.get_avatar_bytes(self.avatar_url)
-            if webhooks:
-                webhook = webhooks[0]
-            else:
-                webhook = await channel.create_webhook(
-                    name="VerificationWebhook",
-                    avatar=avatar_bytes
-                )
+            webhook = webhooks[0] if webhooks else await channel.create_webhook(
+                name="VerificationWebhook",
+                avatar=avatar_bytes
+            )
 
             embed = discord.Embed(
                 title="Верификация на сервере",
                 description=f"Нажмите на реакцию {self.verify_emoji}, чтобы получить доступ к серверу!",
-                color=discord.Color.red()  # красная полоска слева
+                color=discord.Color.red()
             )
+
             msg = await webhook.send(
                 embed=embed,
                 wait=True,
@@ -90,54 +91,58 @@ class Verification(commands.Cog):
             )
             await msg.add_reaction(self.verify_emoji)
             self.save_message_id(msg.id)
-            print(f"[Verification] Сообщение верификации создано и реакция добавлена.")
+            logger.info("Сообщение верификации создано и реакция добавлена.")  # INFO
         except Exception as e:
-            print(f"[Verification] Ошибка при создании сообщения через вебхук: {e}")
+            logger.error(f"Ошибка при создании сообщения через вебхук: {e}")
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
-        if payload.user_id == self.bot.user.id:
+        if payload.user_id == self.bot.user.id or payload.channel_id != self.verify_channel_id:
             return
-        if payload.channel_id != self.verify_channel_id:
-            return
-        msg_id = self.load_message_id()
-        if payload.message_id != msg_id:
-            return
-        if str(payload.emoji) != self.verify_emoji:
+        if payload.message_id != self.load_message_id() or str(payload.emoji) != self.verify_emoji:
             return
 
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
-            print(f"[Verification] Сервер с ID {payload.guild_id} не найден!")
+            logger.warning(f"Сервер с ID {payload.guild_id} не найден!")
             return
 
         member = guild.get_member(payload.user_id)
         if not member:
-            print(f"[Verification] Участник с ID {payload.user_id} не найден!")
+            logger.warning(f"Участник с ID {payload.user_id} не найден!")
             return
 
         role = guild.get_role(self.verified_role_id)
         if not role:
-            print(f"[Verification] Роль с ID {self.verified_role_id} не найдена!")
+            logger.warning(f"Роль с ID {self.verified_role_id} не найдена!")
             return
 
         if role not in member.roles:
             try:
                 await member.add_roles(role)
-                print(f"[Verification] Роль {role.name} выдана пользователю {member}.")
+                logger.success(f"Роль {role.name} выдана пользователю {member}.")
+
+                # Отправка ЛС через 3 секунды
+                await asyncio.sleep(3)
+                try:
+                    await member.send(
+                        f"Привет, {member.display_name}! ✅ "
+                        f"Вы успешно верифицированы на сервере.\n\n"
+                        f"Если вы хотите полноценно вступить в клан, введите команду `/заявка` и пройдите все вопросы."
+                    )
+                    logger.info(f"Отправлено ЛС пользователю {member}.")
+                except discord.Forbidden:
+                    logger.warning(f"Не удалось отправить ЛС пользователю {member}. Он мог закрыть личку.")
             except discord.Forbidden:
-                print(f"[Verification] Нет прав для выдачи роли {role.name} пользователю {member}.")
+                logger.warning(f"Нет прав для выдачи роли {role.name} пользователю {member}.")
             except Exception as e:
-                print(f"[Verification] Ошибка при выдаче роли: {e}")
+                logger.error(f"Ошибка при выдаче роли: {e}")
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
         if payload.channel_id != self.verify_channel_id:
             return
-        msg_id = self.load_message_id()
-        if payload.message_id != msg_id:
-            return
-        if str(payload.emoji) != self.verify_emoji:
+        if payload.message_id != self.load_message_id() or str(payload.emoji) != self.verify_emoji:
             return
 
         guild = self.bot.get_guild(payload.guild_id)
@@ -152,11 +157,11 @@ class Verification(commands.Cog):
         if role and role in member.roles:
             try:
                 await member.remove_roles(role)
-                print(f"[Verification] Роль {role.name} снята с пользователя {member}.")
+                logger.info(f"Роль {role.name} снята с пользователя {member}.")
             except discord.Forbidden:
-                print(f"[Verification] Нет прав для снятия роли {role.name} с пользователя {member}.")
+                logger.warning(f"Нет прав для снятия роли {role.name} с пользователя {member}.")
             except Exception as e:
-                print(f"[Verification] Ошибка при снятии роли: {e}")
+                logger.error(f"Ошибка при снятии роли: {e}")
 
 
 async def setup(bot: commands.Bot):
