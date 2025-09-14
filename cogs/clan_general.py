@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
-import data  # наш модуль с ленивым кэшем stats и active_duels
+import data
 
 logger = logging.getLogger("ClanGeneralCog")
 

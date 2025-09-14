@@ -1,138 +1,115 @@
 import logging
 import sys
 import os
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import RotatingFileHandler
+from datetime import datetime
+from github import Github
 
-# === ⚔️ Кастомный уровень SUCCESS ===
-SUCCESS = 25
-logging.addLevelName(SUCCESS, "SUCCESS")
-
-def success(self, message, *args, **kwargs):
-    self.log(SUCCESS, message, *args, **kwargs)
-
-logging.Logger.success = success
-
-# === ⚔️ Сообщения Discord ===
-DISCORD_MESSAGES = {
-    "logging in using static token": "🔑 ⚔️ Священный ключ крепости активирован",
-    "has connected to gateway": "🌌 ⚔️ Брат подключился к варп-шлюзу",
-    "disconnect": "💀 ⚔️ Варп пожрал соединение",
-}
-
-def transform_discord_message(msg: str) -> str:
-    msg_l = msg.lower()
-    for k, v in DISCORD_MESSAGES.items():
-        if k in msg_l:
-            return v
-    return msg
-
-# === ⚔️ Форматтер для консоли ===
-class LegionFormatter(logging.Formatter):
+class ColorFormatter(logging.Formatter):
     COLORS = {
-        'DEBUG': '\033[90m',        # серый
-        'INFO': '\033[96m',         # бирюзовый
-        'WARNING': '\033[93m',      # жёлтый
-        'ERROR': '\033[91m',        # красный
-        'CRITICAL': '\033[1;91m',   # жирный красный
-        'SUCCESS': '\033[92m',      # зелёный
-        'RESET': '\033[0m',         # сброс
-    }
-
-    SYMBOLS = {
-        'DEBUG': '👁️',
-        'INFO': '📖',
-        'WARNING': '⚠️',
-        'ERROR': '🔥',
-        'CRITICAL': '💀',
-        'SUCCESS': '✠',
+        'DEBUG': '\033[90m',
+        'INFO': '\033[94m',
+        'WARNING': '\033[93m',
+        'ERROR': '\033[91m',
+        'CRITICAL': '\033[1;91m',
+        'SUCCESS': '\033[92m',
+        'RESET': '\033[0m',
     }
 
     def format(self, record):
-        record.msg = transform_discord_message(record.getMessage())
-        record.args = ()
         color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
-        symbol = self.SYMBOLS.get(record.levelname, '✠')
         reset = self.COLORS['RESET']
-        base_message = super().format(record)
-        return f"{color}{symbol} {base_message}{reset}"
+        message = super().format(record)
+        return f"{color}{message}{reset}"
 
-# === ⚔️ Форматтер для файлов (без цветов, с ограничением длины) ===
-class LimitedLengthFormatter(logging.Formatter):
-    MAX_LEN = 150
+class CustomDiscordFormatter(logging.Formatter):
     def format(self, record):
-        record.msg = transform_discord_message(record.getMessage())
-        record.args = ()
-        s = super().format(record)
-        if len(s) > self.MAX_LEN:
-            s = s[:self.MAX_LEN-3] + "..."
-        return s
+        msg = record.getMessage()
+        if "logging in using static token" in msg:
+            record.msg = "🔑 Авторизация через токен выполнена"
+            record.args = ()
+        elif "has connected to Gateway" in msg:
+            record.msg = "🌐 Шард успешно подключён к Gateway"
+            record.args = ()
+        return super().format(record)
 
-# === ⚔️ Фильтр для трансформации сообщений Discord ===
-class DiscordTransformFilter(logging.Filter):
-    def filter(self, record):
-        record.msg = transform_discord_message(record.getMessage())
-        return True
+def setup_logging(config, log_level=logging.INFO):
+    log_format = "%(asctime)s | %(levelname)-8s | %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
 
-# === ⚔️ Вспомогательные функции ===
-def make_stream_handler(formatter: logging.Formatter, level: int = logging.INFO) -> logging.StreamHandler:
-    handler = logging.StreamHandler(sys.stdout)
+    os.makedirs("logs", exist_ok=True)
+    today_log = "logs/bot.log"
+
+    # 🔹 Архивация и пуш в GitHub только если локальный файл существует
+    if os.path.exists(today_log) and os.path.getsize(today_log) > 0:
+        # Переименуем в формат с датой вчерашнего дня
+        yesterday = datetime.now().strftime("%Y-%m-%d")
+        archive_name = f"bot-{yesterday}.log"
+        temp_path = f"logs/{archive_name}"
+        os.rename(today_log, temp_path)
+
+        # Пушим в GitHub
+        try:
+            token = config.get("GITHUB_TOKEN")
+            repo_name = config.get("REPO_NAME")
+            if token and repo_name:
+                g = Github(token)
+                repo = g.get_repo(repo_name)
+
+                repo_path = f"logs_archive/{archive_name}"
+                with open(temp_path, "rb") as f:
+                    content = f.read()
+
+                try:
+                    existing_file = repo.get_contents(repo_path)
+                    repo.update_file(repo_path, f"Обновление {archive_name}", content, existing_file.sha)
+                except Exception:
+                    repo.create_file(repo_path, f"Архив логов {archive_name}", content)
+
+                print(f"✅ Локальный лог {archive_name} загружен в репозиторий {repo_name}")
+
+        except Exception as e:
+            print(f"⚠️ Ошибка при загрузке лога в GitHub: {e}")
+
+        # 🧹 Удаляем локальный архив после пуша
+        os.remove(temp_path)
+
+    # 📦 Настройка ротационного логгера для текущего дня
+    file_handler = RotatingFileHandler(today_log, maxBytes=5*1024*1024, backupCount=1, encoding="utf-8")
+    file_formatter = logging.Formatter(log_format, datefmt=date_format)
+    file_handler.setFormatter(file_formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    root_logger.handlers.clear()
+    root_logger.addHandler(file_handler)
+
+    # 🎨 Консольный лог с цветом
+    console_handler = logging.StreamHandler(sys.stdout)
     try:
-        handler.stream.reconfigure(encoding='utf-8')
+        console_handler.stream.reconfigure(encoding="utf-8")
     except AttributeError:
         pass
-    handler.setFormatter(formatter)
-    handler.setLevel(level)
-    return handler
+    console_handler.setFormatter(ColorFormatter(log_format, datefmt=date_format))
+    root_logger.addHandler(console_handler)
 
-def make_timed_file_handler(filename: str, formatter: logging.Formatter, backup_count: int = 7) -> TimedRotatingFileHandler:
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    handler = TimedRotatingFileHandler(
-        filename,
-        when="midnight",
-        interval=1,
-        backupCount=backup_count,
-        encoding="utf-8"
-    )
-    handler.setFormatter(formatter)
-    return handler
-
-# === ⚔️ Настройка логирования ===
-def setup_logging(log_level=logging.INFO, backup_count=7):
-    LOG_FORMAT = "%(asctime)s | %(levelname)-8s | [%(name)s] | %(message)s"
-    DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-    discord_filter = DiscordTransformFilter()
-
-    # === Root logger ===
-    root_logger = logging.getLogger()
-    root_logger.handlers.clear()
-    root_logger.setLevel(log_level)
-
-    root_logger.addHandler(make_timed_file_handler("logs/logging.log", LimitedLengthFormatter(LOG_FORMAT, datefmt=DATE_FORMAT), backup_count))
-    root_logger.addHandler(make_stream_handler(LegionFormatter(LOG_FORMAT, datefmt=DATE_FORMAT), log_level))
-    root_logger.addFilter(discord_filter)
-
-    # Заголовок новой сессии
-    root_logger.info("="*80)
-    root_logger.info("✠ Звёздная крепость Рапторус Рекс пробуждается из варпа... ✠")
-    root_logger.info("="*80)
-
-    # === Discord logger ===
+    # 🪵 Discord-логгер
     discord_logger = logging.getLogger("discord")
-    discord_logger.handlers.clear()
     discord_logger.setLevel(log_level)
     discord_logger.propagate = False
-    discord_logger.addHandler(make_stream_handler(LegionFormatter(LOG_FORMAT, datefmt=DATE_FORMAT), log_level))
-    discord_logger.addFilter(discord_filter)
+    discord_logger.handlers.clear()
+    discord_handler = logging.StreamHandler(sys.stdout)
+    try:
+        discord_handler.stream.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+    discord_handler.setFormatter(CustomDiscordFormatter(log_format, datefmt=date_format))
+    discord_logger.addHandler(discord_handler)
 
-    # === Duel logger ===
-    duel_logger = logging.getLogger("duel")
-    duel_logger.handlers.clear()
-    duel_logger.setLevel(logging.INFO)
-    duel_logger.propagate = False
-    duel_logger.addHandler(make_timed_file_handler(
-        "logs/duels.log",
-        LimitedLengthFormatter("%(asctime)s | [DUEL] ⚔️ | %(levelname)-8s | %(message)s", datefmt=DATE_FORMAT),
-        backup_count
-    ))
-    duel_logger.addFilter(discord_filter)
+    # 🔥 Добавляем кастомный уровень SUCCESS
+    logging.SUCCESS = 25
+    logging.addLevelName(logging.SUCCESS, "SUCCESS")
+    def success(self, message, *args, **kwargs):
+        if self.isEnabledFor(logging.SUCCESS):
+            self._log(logging.SUCCESS, message, args, **kwargs)
+    logging.Logger.success = success

@@ -3,9 +3,6 @@ import logging
 from discord.ext import commands
 from discord import app_commands
 
-# --- Настройка логгера для этого кога ---
-logger = logging.getLogger("ClanInfoCog")
-
 class ClanInfo(commands.Cog):
     def __init__(self, bot: commands.Bot, clan_role_names: list[str]):
         self.bot = bot
@@ -16,11 +13,10 @@ class ClanInfo(commands.Cog):
         try:
             await self.bot.tree.sync()
         except Exception as e:
-            logger.error(f"❌ Ошибка при синхронизации команд: {e}")
+            logging.error(f"❌ Ошибка при синхронизации команд: {e}")
 
     @app_commands.command(name="состав_клана", description="Отправить информацию о составе клана.")
     async def clan_info(self, interaction: discord.Interaction):
-        logger.info(f"{interaction.user} вызвал команду /состав_клана")
         await self.send_clan_member_info(interaction)
 
     async def send_clan_member_info(self, interaction: discord.Interaction):
@@ -32,12 +28,10 @@ class ClanInfo(commands.Cog):
                 "❌ У меня нет прав на создание вебхуков в этом канале.",
                 ephemeral=True
             )
-            logger.warning(f"{interaction.user} вызвал /состав_клана, но нет прав на создание вебхука")
             return
 
         try:
             webhook = await channel.create_webhook(name=self.bot.user.name)
-            logger.info(f"Создан вебхук {webhook.name} для отправки информации о клане")
 
             members_by_role = {role: [] for role in self.clan_role_names}
             for member in guild.members:
@@ -74,11 +68,11 @@ class ClanInfo(commands.Cog):
             await webhook.delete()
 
             await interaction.response.send_message("✅ Информация о клане отправлена через вебхук.", ephemeral=True)
-            logger.info(f"Информация о клане успешно отправлена по запросу {interaction.user}")
 
         except Exception as e:
-            logger.error(f"❌ Ошибка при отправке информации о клане: {e}")
+            logging.error(f"❌ Ошибка при отправке информации о клане: {e}")
             await interaction.response.send_message("❌ Не удалось отправить информацию о клане.", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     from config import load_config

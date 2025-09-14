@@ -1,15 +1,12 @@
+import os
 import discord
 from discord import app_commands
 from discord.ext import commands
-from config import load_config
-import asyncio
-import logging
-from typing import Optional, List, Tuple
+from datetime import datetime
+from github import Github
 
-config = load_config()
-
-# Константы
-QUESTIONS: List[str] = [
+# Список вопросов для вступления
+QUESTIONS = [
     "Какой стиль игры тебе больше всего нравится (агрессивный, стратегический, поддержка и т. д.)?",
     "Есть ли у тебя опыт командной работы и как ты решаешь конфликты в команде?",
     "Как ты предпочитаешь получать информацию о клановых активностях и новостях?",
@@ -19,222 +16,189 @@ QUESTIONS: List[str] = [
     "Как ты относишься к критике и каким образом ты обычно её воспринимаешь?",
     "Какие у тебя ожидания от общения с другими членами клана?",
     "В какое время тебе удобно играть?",
-    "Боитесь ли вы незнакомых людей и тревожит ли вас это?",
+    "Боитесь ли вы незнакомых людей и тревожить их?",
     "Ваша цель вступления в клан?",
     "Какая ваша страна проживания и какой у вас часовой пояс?"
 ]
 
-APPROVE_EMOJI = "✅"
-DECLINE_EMOJI = "❌"
-
-TIMEOUT_MESSAGE = "⏱ Время на ответ истекло. Пожалуйста, начните заново с команды `/заявка`."
-ERROR_GUILD_MESSAGE = "❌ Не удалось определить сервер. Попробуйте позже."
-ERROR_CHANNEL_MESSAGE = "❌ Канал для заявок не настроен!"
-
+def push_to_github(user_name, answers):
+    """Сохраняет заявку в репозиторий GitHub в папку applications/"""
+    token = os.getenv("MY_GITHUB_TOKEN")
+    repo_name = os.getenv("REPO_NAME", "Legion-Of-The-Damned/-VS-Data-Base")
+    
+    if not token:
+        print("GitHub token не найден!")
+        return
+    
+    g = Github(token)
+    repo = g.get_repo(repo_name)
+    
+    folder_path = "applications"  # фиксированная папка для всех заявок
+    
+    # Формируем контент
+    content = f"Пользователь: {user_name}\nДата: {datetime.utcnow()}\n\n"
+    for i, answer in enumerate(answers, start=1):
+        content += f"Вопрос {i}: {answer}\n"
+    
+    # Имя файла: user_метка_времени.txt
+    file_name = f"{folder_path}/{user_name}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.txt"
+    
+    try:
+        repo.create_file(file_name, f"Новая заявка от {user_name}", content)
+        print(f"Заявка {user_name} успешно загружена на GitHub в {file_name}")
+    except Exception as e:
+        print(f"Ошибка при загрузке на GitHub: {e}")
 
 class Applications(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot):
         self.bot = bot
-        self.APPLICATIONS_CHANNEL_ID: int = config.get("APPLICATIONS_CHANNEL_ID")
-        self.MEMBER_ROLE_ID: int = config.get("MEMBER_ROLE_ID")
-        self.STAFF_ROLE_NAME: str = config.get("STAFF_ROLE_NAME", "Модератор")
-        self.OLD_ROLE_ID: Optional[int] = config.get("FRIEND_ROLE_ID")
-        self.GUILD_ID: int = config.get("GUILD_ID")
-        self.logger = logging.getLogger("Applications")
+        self.APPLICATIONS_CHANNEL_ID = 1362357361863295199
+        self.MEMBER_ROLE_NAME = "💀Легион Проклятых🔥"
+        self.OLD_ROLE_NAME = "🤝Друг клана🚩"
 
-    def is_staff_member(self, member: discord.Member) -> bool:
-        """Проверка, является ли участник модератором/админом."""
-        return member.guild_permissions.administrator or discord.utils.get(
-            member.guild.roles, name=self.STAFF_ROLE_NAME
-        ) in member.roles
+    async def is_staff(self, interaction: discord.Interaction):
+        """Проверка, является ли пользователь администратором или модератором"""
+        if interaction.user.guild_permissions.administrator:
+            return True
+        
+        staff_role = discord.utils.get(interaction.guild.roles, name="Модератор")
+        if staff_role and staff_role in interaction.user.roles:
+            return True
+            
+        raise app_commands.MissingPermissions(["administrator"])
 
-    async def get_user_from_embed(
-        self, embed: discord.Embed, guild: discord.Guild
-    ) -> Optional[discord.Member]:
-        """Получение участника по footer embed."""
+    @app_commands.command(name="заявка", description="Подать заявку на вступление")
+    async def application(self, interaction: discord.Interaction):
+        """Пошаговое создание заявки через ЛС или сервер"""
         try:
-            if not embed.footer or not embed.footer.text:
-                return None
-            user_id = int(embed.footer.text.replace("ID:", "").strip())
-            return guild.get_member(user_id)
-        except Exception as e:
-            self.logger.error(f"Ошибка при извлечении пользователя из embed: {e}")
-            return None
+            answers = []
 
-    async def ask_questions(
-        self, member: discord.Member
-    ) -> Optional[List[Tuple[str, str]]]:
-        """Сбор ответов через ЛС."""
-        if member.bot:
-            self.logger.warning(f"Нельзя собирать ответы у бота {member}")
-            return None
+            if isinstance(interaction.channel, discord.DMChannel) or interaction.guild is None:
+                channel = interaction.user
+            else:
+                try:
+                    channel = await interaction.user.create_dm()
+                except:
+                    return await interaction.response.send_message(
+                        "❌ Не удалось отправить ЛС. Разрешите личные сообщения от участников сервера.",
+                        ephemeral=True
+                    )
 
-        answers: List[Tuple[str, str]] = []
-        try:
-            dm = await member.create_dm()
-            self.logger.info(f"Начат процесс сбора ответов у {member}")
+            await interaction.response.send_message(
+                "📩 Я отправил тебе личные сообщения с вопросами для заявки!", ephemeral=True
+            )
 
             for question in QUESTIONS:
-                await dm.send(question)
+                await channel.send(f"{question}")
 
-                def check(m: discord.Message) -> bool:
-                    return m.author == member and isinstance(m.channel, discord.DMChannel)
+                def check(m):
+                    return m.author == interaction.user and isinstance(m.channel, discord.DMChannel)
 
                 try:
-                    msg = await self.bot.wait_for("message", check=check, timeout=300)
-                except asyncio.TimeoutError:
-                    await dm.send(TIMEOUT_MESSAGE)
-                    self.logger.warning(f"{member} не успел ответить на все вопросы в ЛС")
-                    return None
+                    msg = await self.bot.wait_for('message', check=check, timeout=300)
+                    answers.append(msg.content)
+                except:
+                    await channel.send("⏰ Время на ответ истекло. Пожалуйста, попробуй снова командой /заявка.")
+                    return
 
-                if not msg.content.strip():
-                    await dm.send("⚠ Ответ не может быть пустым. Попробуйте заново.")
-                    return None
+            # Отправка заявки в канал Discord
+            application_channel = self.bot.get_channel(self.APPLICATIONS_CHANNEL_ID)
+            if not isinstance(application_channel, discord.TextChannel):
+                return await channel.send("❌ Ошибка: канал для заявок не настроен!")
 
-                answers.append((question, msg.content.strip()))
+            embed = discord.Embed(
+                title="📄 Новая заявка",
+                description=f"**Пользователь:** {interaction.user.mention}",
+                color=discord.Color.blue()
+            )
 
-            self.logger.info(f"{member} успешно ответил на все вопросы")
-            return answers
+            for i, answer in enumerate(answers):
+                embed.add_field(name=f"Вопрос {i+1}", value=answer, inline=False)
 
-        except discord.Forbidden:
-            self.logger.warning(f"Не удалось открыть ЛС с {member}")
-            return None
+            embed.set_footer(text=f"ID пользователя: {interaction.user.id}")
+
+            msg = await application_channel.send(embed=embed)
+            await msg.add_reaction('✅')
+            await msg.add_reaction('❌')
+
+            await channel.send("✅ Ваша заявка отправлена на рассмотрение!")
+
+            # Отправка заявки в GitHub
+            push_to_github(str(interaction.user), answers)
+        
         except Exception as e:
-            self.logger.error(f"Ошибка при сборе ответов у {member}: {e}")
-            return None
-
-    async def safe_dm(self, member: discord.Member, message: str) -> None:
-        """Отправка ЛС с защитой от Forbidden и проверки на бота."""
-        if member.bot:
-            self.logger.warning(f"Попытка отправить ЛС боту: {member}")
-            return
-        try:
-            await member.send(message)
-        except discord.Forbidden:
-            self.logger.warning(f"Не удалось отправить ЛС {member}")
-        except Exception as e:
-            self.logger.error(f"Ошибка при отправке ЛС {member}: {e}")
-
-    @app_commands.command(
-        name="заявка",
-        description="Подать заявку на вступление в клан"
-    )
-    async def application(self, interaction: discord.Interaction):
-        member = interaction.user
-
-        # Проверка, что это не бот
-        if member.bot:
+            print(f"Ошибка в команде заявка: {e}")
             await interaction.response.send_message(
-                "⚠ Боты не могут подавать заявки.", ephemeral=True
+                "❌ Произошла ошибка при отправке заявки.", ephemeral=True
             )
-            return
-
-        # Сообщение пользователю о начале процесса
-        if isinstance(interaction.channel, discord.DMChannel):
-            await interaction.response.send_message(
-                "Начинаю сбор ответов через ЛС...", ephemeral=True
-            )
-            self.logger.info(f"{member} начал подачу заявки через ЛС")
-        else:
-            await interaction.response.send_message(
-                "📩 Void Sentinel ждёт ваших ответов на все вопросы в ЛС...",
-                ephemeral=True
-            )
-            self.logger.info(f"{member} начал подачу заявки через сервер")
-
-        # Сбор ответов
-        answers = await self.ask_questions(member)
-        if not answers:
-            return
-
-        # Получение гильдии
-        guild = self.bot.get_guild(self.GUILD_ID)
-        if not guild:
-            await self.safe_dm(member, ERROR_GUILD_MESSAGE)
-            return
-
-        # Получение канала для заявок
-        application_channel = self.bot.get_channel(self.APPLICATIONS_CHANNEL_ID)
-        if not isinstance(application_channel, discord.TextChannel):
-            await self.safe_dm(member, ERROR_CHANNEL_MESSAGE)
-            return
-
-        # Создание embed с заявкой
-        embed = discord.Embed(
-            title="📄 Новая заявка",
-            description=f"**Пользователь:** {member.mention}",
-            color=discord.Color.blue()
-        )
-        for q, ans in answers:
-            embed.add_field(name=q, value=ans, inline=False)
-        embed.set_footer(text=f"ID:{member.id}")
-
-        # Отправка заявки в канал
-        msg = await application_channel.send(embed=embed)
-        await msg.add_reaction(APPROVE_EMOJI)
-        await msg.add_reaction(DECLINE_EMOJI)
-        self.logger.info(f"Заявка от {member} отправлена в {application_channel.name}")
-
-        # Уведомление модераторов
-        for guild_member in guild.members:
-            if self.is_staff_member(guild_member) and not guild_member.bot:
-                await self.safe_dm(
-                    guild_member,
-                    f"📌 Новая заявка от {member.mention} в {application_channel.mention}"
-                )
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        if payload.channel_id != self.APPLICATIONS_CHANNEL_ID:
-            return
-
-        guild = self.bot.get_guild(self.GUILD_ID)
-        if not guild:
-            self.logger.error("Не удалось получить сервер для реакции")
-            return
-
-        member = guild.get_member(payload.user_id)
-        if not member or member.bot or not self.is_staff_member(member):
-            return
-
-        channel = self.bot.get_channel(payload.channel_id)
-        if not isinstance(channel, discord.TextChannel):
-            return
-
+        """Обработка реакций на заявки"""
         try:
+            if payload.channel_id != self.APPLICATIONS_CHANNEL_ID:
+                return
+            
+            guild = self.bot.get_guild(payload.guild_id)
+            if not guild:
+                return
+            
+            member = guild.get_member(payload.user_id)
+            if not member or member.bot:
+                return
+            
+            channel = self.bot.get_channel(payload.channel_id)
+            if not channel:
+                return
+            
             message = await channel.fetch_message(payload.message_id)
-        except Exception as e:
-            self.logger.error(f"Не удалось получить сообщение: {e}")
-            return
+            if not message.embeds:
+                return
+            
+            if not (member.guild_permissions.administrator or 
+                   any(role.name == "Модератор" for role in member.roles)):
+                return
+            
+            embed = message.embeds[0]
+            if not embed.footer or not embed.footer.text:
+                return
+                
+            footer_parts = embed.footer.text.split("ID пользователя: ")
+            if len(footer_parts) < 2:
+                return
+                
+            try:
+                user_id = int(footer_parts[1])
+            except ValueError:
+                return
+                
+            target_member = guild.get_member(user_id)
+            if not target_member:
+                return
 
-        if not message.embeds:
-            return
-
-        target_member = await self.get_user_from_embed(message.embeds[0], guild)
-        if not target_member:
-            return
-
-        role = guild.get_role(self.MEMBER_ROLE_ID)
-        old_role = guild.get_role(self.OLD_ROLE_ID) if self.OLD_ROLE_ID else None
-
-        try:
-            if str(payload.emoji) == APPROVE_EMOJI:
-                if old_role and old_role in target_member.roles:
+            old_role = discord.utils.get(guild.roles, name=self.OLD_ROLE_NAME)
+            new_role = discord.utils.get(guild.roles, name=self.MEMBER_ROLE_NAME)
+            
+            if str(payload.emoji) == '✅':
+                if old_role in target_member.roles:
                     await target_member.remove_roles(old_role)
-                if role:
-                    await target_member.add_roles(role)
-                await self.safe_dm(target_member, "🎉 Ваша заявка была одобрена! Добро пожаловать на сервер!")
-                await message.delete()
-                self.logger.info(f"Заявка {target_member} одобрена модератором {member}")
+                if new_role:
+                    await target_member.add_roles(new_role)
 
-            elif str(payload.emoji) == DECLINE_EMOJI:
-                await self.safe_dm(target_member, "😕 Ваша заявка была отклонена модератором.")
                 await message.delete()
-                self.logger.info(f"Заявка {target_member} отклонена модератором {member}")
-
+                try:
+                    await target_member.send('🎉 Ваша заявка была одобрена! Добро пожаловать в клан!')
+                except:
+                    pass
+            
+            elif str(payload.emoji) == '❌':
+                try:
+                    await target_member.send('😕 Ваша заявка была отклонена модератором.')
+                except:
+                    pass
+                
         except Exception as e:
-            self.logger.error(f"Ошибка при обработке заявки {target_member}: {e}")
+            print(f"Ошибка в обработке реакций: {e}")
 
-
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(Applications(bot))

@@ -1,8 +1,11 @@
 import json
 import base64
 import asyncio
+import logging
 from github import Github
 from config import load_config
+
+logger = logging.getLogger("github_data")
 
 # --- Конфигурация GitHub ---
 config = load_config()
@@ -21,9 +24,10 @@ def load_github_json(filename):
     try:
         contents = repo.get_contents(filename)
         decoded = base64.b64decode(contents.content).decode("utf-8")
-        return json.loads(decoded)
+        data = json.loads(decoded)
+        return data
     except Exception as e:
-        print(f"[ERROR] Ошибка загрузки {filename}: {e}")
+        logger.error(f"⚠️ Ошибка загрузки {filename}: {e}")
         return {}
 
 def save_github_json(filename, data, commit_message="Обновление данных"):
@@ -31,20 +35,23 @@ def save_github_json(filename, data, commit_message="Обновление дан
     try:
         contents = repo.get_contents(filename)
         repo.update_file(contents.path, commit_message, json_data, contents.sha)
+        logger.success(f"✅ Файл {filename} успешно обновлён")
     except Exception as e:
         if "404" in str(e) or "Not Found" in str(e):
             try:
                 repo.create_file(filename, commit_message, json_data)
+                logger.success(f"✅ Файл {filename} успешно создан")
             except Exception as err:
-                print(f"[ERROR] Ошибка создания файла {filename}: {err}")
+                logger.error(f"⚠️ Ошибка создания файла {filename}: {err}")
         elif "409" in str(e):
             try:
                 contents = repo.get_contents(filename)
                 repo.update_file(contents.path, commit_message, json_data, contents.sha)
+                logger.success(f"✅ Файл {filename} успешно обновлён после конфликта")
             except Exception as err:
-                print(f"[ERROR] Ошибка повторного обновления {filename}: {err}")
+                logger.error(f"⚠️ Ошибка повторного обновления {filename}: {err}")
         else:
-            print(f"[ERROR] Ошибка сохранения {filename}: {e}")
+            logger.error(f"⚠️ Ошибка сохранения {filename}: {e}")
 
 async def async_load_json(filename):
     return await asyncio.to_thread(load_github_json, filename)
@@ -69,14 +76,14 @@ async def save_stats():
     try:
         await async_save_json("duel_stats.json", stats, "Обновление статистики дуэлей")
     except Exception as e:
-        print(f"[ERROR] Ошибка сохранения статистики: {e}")
+        logger.error(f"⚠️ Ошибка сохранения статистики: {e}")
 
 async def save_active_duels():
     global active_duels
     try:
         await async_save_json("active_duels.json", active_duels, "Обновление активных дуэлей")
     except Exception as e:
-        print(f"[ERROR] Ошибка сохранения активных дуэлей: {e}")
+        logger.error(f"⚠️ Ошибка сохранения активных дуэлей: {e}")
 
 # --- Обновление статистики после дуэли ---
 def update_stats(winner_id, loser_id):
@@ -94,3 +101,13 @@ def update_stats(winner_id, loser_id):
 
     # Асинхронно сохраняем статистику
     asyncio.create_task(save_stats())
+    logger.success(f"🎯 Статистика обновлена: победитель {winner_id}, проигравший {loser_id}")
+
+# --- Функции для когов ---
+async def get_stats():
+    global stats
+    return stats
+
+async def get_active_duels():
+    global active_duels
+    return active_duels
