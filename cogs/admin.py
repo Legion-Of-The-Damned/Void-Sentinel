@@ -5,10 +5,10 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import timedelta
 from discord.ui import Select, View
-from data import active_duels, save_active_duels, update_stats, stats
+from data import active_duels, save_active_duels, update_stats
 
-# --- Настройка логгера для этого кога ---
-logger = logging.getLogger("AdminCog")
+# --- Настройка логгера ---
+logger = logging.getLogger("Admin")
 
 
 class Admin(commands.Cog):
@@ -21,9 +21,11 @@ class Admin(commands.Cog):
     @commands.hybrid_command(name="победа", description="Выбрать дуэль и присудить победу (только для админов)")
     async def assign_winner_select(self, ctx: commands.Context):
         if not ctx.author.guild_permissions.kick_members:
+            logger.warning(f"{ctx.author} попытался открыть выбор дуэли без прав")
             return await ctx.send("❌ У вас нет прав для назначения победителя.", ephemeral=True)
 
         if not active_duels:
+            logger.info(f"{ctx.author} открыл выбор дуэли, но активных дуэлей нет")
             return await ctx.send("Нет активных дуэлей.", ephemeral=True)
 
         view = DuelSelectionView(ctx)
@@ -42,16 +44,16 @@ class Admin(commands.Cog):
         try:
             await self.banish_from_clan(member)
             await interaction.followup.send(f"✅ {member.mention} был изгнан и получил роль **Друг клана**.")
-            logger.info(f"{interaction.user} изгнал {member}")
+            logger.success(f"{interaction.user} успешно изгнал {member}")
         except Exception:
             logger.error(f"Ошибка при изгнании {member}:\n{traceback.format_exc()}")
-            await interaction.followup.send(f"❌ Не удалось изгнать {member.mention}.")
+            await interaction.followup.send(f"❌ Не удалось изгнать {member}.")
 
     async def banish_from_clan(self, member: discord.Member):
         roles_to_remove = [r for r in member.roles if r.id in self.clan_role_ids]
         try:
             await member.remove_roles(*roles_to_remove, reason="Изгнан из клана (админ команда)")
-            logger.info(f"С ролями {roles_to_remove} удалён у {member}")
+            logger.info(f"Удалены роли {roles_to_remove} у {member}")
         except discord.Forbidden:
             logger.warning(f"Не удалось снять роли с {member.display_name} — недостаточно прав")
             return
@@ -67,7 +69,7 @@ class Admin(commands.Cog):
             )
             logger.info(f"Отправлено ЛС {member} о изгнании")
         except discord.Forbidden:
-            logger.info(f"Не удалось отправить ЛС участнику {member.display_name}")
+            logger.warning(f"Не удалось отправить ЛС участнику {member.display_name}")
 
     # --- /бан ---
     @app_commands.command(name="бан", description="Банит участника на сервере")
@@ -84,11 +86,11 @@ class Admin(commands.Cog):
                     f"Причина: {reason}\nМодератор: {interaction.user.display_name}"
                 )
             except discord.Forbidden:
-                logger.info(f"Не удалось отправить ЛС {member} перед баном")
+                logger.warning(f"Не удалось отправить ЛС {member} перед баном")
 
             await member.ban(reason=f"Забанен модератором {interaction.user} — Причина: {reason}")
             await interaction.response.send_message(f"⛔ {member.mention} был забанен. Причина: {reason}")
-            logger.info(f"{interaction.user} забанил {member} — Причина: {reason}")
+            logger.success(f"{interaction.user} забанил {member} — Причина: {reason}")
         except Exception as e:
             logger.error(f"Ошибка при бане {member}: {e}")
             await interaction.response.send_message("❌ Не удалось забанить участника.", ephemeral=True)
@@ -117,10 +119,10 @@ class Admin(commands.Cog):
                     f"Модератор: {interaction.user.display_name}\nПричина: {reason}"
                 )
             except discord.Forbidden:
-                logger.info(f"Не удалось отправить ЛС пользователю {user.name} после разбана")
+                logger.warning(f"Не удалось отправить ЛС пользователю {user.name} после разбана")
 
             await interaction.response.send_message(f"✅ Пользователь {user.name} был разбанен.")
-            logger.info(f"{interaction.user} разбанил {user} — Причина: {reason}")
+            logger.success(f"{interaction.user} разбанил {user} — Причина: {reason}")
         except discord.NotFound:
             await interaction.response.send_message("❌ Этот пользователь не забанен.", ephemeral=True)
             logger.warning(f"{interaction.user} попытался разбанить незабаненного пользователя {user}")
@@ -158,11 +160,11 @@ class Admin(commands.Cog):
                     f"Ты был кикнут с сервера **{interaction.guild.name}**.\nПричина: {reason}"
                 )
             except discord.Forbidden:
-                logger.info(f"Не удалось отправить ЛС {member} перед киком")
+                logger.warning(f"Не удалось отправить ЛС {member} перед киком")
 
             await member.kick(reason=f"Кикнут модератором {interaction.user} — Причина: {reason}")
             await interaction.response.send_message(f"👢 {member.mention} был кикнут с сервера. Причина: {reason}")
-            logger.info(f"{interaction.user} кикнул {member} — Причина: {reason}")
+            logger.success(f"{interaction.user} кикнул {member} — Причина: {reason}")
         except Exception as e:
             logger.error(f"Ошибка при кике {member}: {e}")
             await interaction.response.send_message("❌ Не удалось кикнуть участника.", ephemeral=True)
@@ -183,11 +185,11 @@ class Admin(commands.Cog):
                     f"Модератор: {interaction.user.display_name}"
                 )
             except discord.Forbidden:
-                logger.info(f"Не удалось отправить ЛС {member} перед мутом")
+                logger.warning(f"Не удалось отправить ЛС {member} перед мутом")
 
             await member.timeout(duration, reason=f"Мут на {minutes} минут (выдан модератором {interaction.user})")
             await interaction.response.send_message(f"🔇 {member.mention} получил мут на {minutes} минут.")
-            logger.info(f"{interaction.user} выдал мут {member} на {minutes} минут")
+            logger.success(f"{interaction.user} выдал мут {member} на {minutes} минут")
         except Exception as e:
             logger.error(f"Ошибка при выдаче мута {member}: {e}")
             await interaction.response.send_message("❌ Не удалось выдать мут.", ephemeral=True)
@@ -207,17 +209,16 @@ class Admin(commands.Cog):
                     f"Ты был размучен на сервере **{interaction.guild.name}**.\nМодератор: {interaction.user.display_name}"
                 )
             except discord.Forbidden:
-                logger.info(f"Не удалось отправить ЛС {member} после размута")
+                logger.warning(f"Не удалось отправить ЛС {member} после размута")
 
             await interaction.response.send_message(f"🔊 {member.mention} размучен.")
-            logger.info(f"{interaction.user} размутил {member}")
+            logger.success(f"{interaction.user} размутил {member}")
         except Exception as e:
             logger.error(f"Ошибка при снятии мута с {member}: {e}")
             await interaction.response.send_message("❌ Не удалось снять мут.", ephemeral=True)
 
 
 # --- Классы для выбора дуэли и победителя ---
-
 class DuelSelectionView(View):
     def __init__(self, ctx: commands.Context):
         super().__init__(timeout=60)
@@ -280,7 +281,6 @@ class WinnerButtonsView(View):
 
             loser_id = duel["opponent_id"] if self.winner_id == duel["challenger_id"] else duel["challenger_id"]
 
-            # --- Обновляем статистику и кэш ---
             update_stats(self.winner_id, loser_id)
             await save_active_duels()
 
@@ -292,7 +292,7 @@ class WinnerButtonsView(View):
                 f"Проигравший: {loser.mention if loser else loser_id}.",
                 ephemeral=False
             )
-            logger.info(f"Дуэль {self.duel_id} завершена. Победитель: {winner}, Проигравший: {loser}")
+            logger.success(f"Дуэль {self.duel_id} завершена. Победитель: {winner}, Проигравший: {loser}")
 
 
 # --- Setup ---

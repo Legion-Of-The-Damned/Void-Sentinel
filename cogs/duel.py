@@ -3,9 +3,14 @@ from discord.ext import commands
 from discord.ui import Button, View, Select
 from discord import app_commands
 import asyncio
+import logging
 
 from data import active_duels, save_active_duels, update_stats, load_data
 from cogs.voting import VotingView
+
+# --- Настройка логгера ---
+logger = logging.getLogger("DuelCog")
+
 
 class Duel(commands.Cog):
     def __init__(self, bot):
@@ -28,8 +33,8 @@ class Duel(commands.Cog):
 
         view = AcceptDuelView(challenger, opponent, duel_channel, self.bot)
         await ctx.send(embed=embed, view=view)
+        logger.info(f"{challenger} вызвал {opponent} на дуэль ({game} в {time}) в канале {duel_channel.name}")
 
-        # Отправка ЛС
         try:
             dm_embed = discord.Embed(
                 title="📬 Тебя вызвали на дуэль!",
@@ -42,10 +47,11 @@ class Duel(commands.Cog):
             )
             dm_embed.set_footer(text="Не забудь заглянуть в чат и принять решение ⚔️")
             await opponent.send(embed=dm_embed)
+            logger.info(f"Отправлено ЛС {opponent} о дуэли с {challenger}")
         except discord.Forbidden:
-            await ctx.send(
-                f"⚠️ {opponent.mention}, я не смог отправить тебе ЛС. Проверь настройки приватности."
-            )
+            await ctx.send(f"⚠️ {opponent.mention}, я не смог отправить тебе ЛС. Проверь настройки приватности.")
+            logger.warning(f"Не удалось отправить ЛС {opponent} о дуэли с {challenger}")
+
 
 class AcceptDuelView(View):
     def __init__(self, challenger, opponent, duel_channel, bot, timeout=600):
@@ -55,7 +61,6 @@ class AcceptDuelView(View):
         self.duel_channel = duel_channel
         self.bot = bot
 
-        # Используем другое имя вместо 'parent'
         self.add_item(self.AcceptButton(self))
         self.add_item(self.DeclineButton(self))
 
@@ -66,7 +71,9 @@ class AcceptDuelView(View):
 
         async def callback(self, interaction: discord.Interaction):
             if interaction.user.id != self.duel_view.opponent.id:
-                return await interaction.response.send_message("Только вызванный может принять вызов!", ephemeral=True)
+                await interaction.response.send_message("Только вызванный может принять вызов!", ephemeral=True)
+                logger.warning(f"{interaction.user} попытался принять чужую дуэль")
+                return
 
             duel_id = f"{self.duel_view.challenger.id}-{self.duel_view.opponent.id}"
             active_duels[duel_id] = {
@@ -74,13 +81,13 @@ class AcceptDuelView(View):
                 "opponent_id": self.duel_view.opponent.id
             }
             await save_active_duels()
+            logger.info(f"Дуэль принята: {self.duel_view.challenger} vs {self.duel_view.opponent} (ID {duel_id})")
 
             await interaction.response.send_message(
                 f"Дуэль принята! {self.duel_view.opponent.mention} против {self.duel_view.challenger.mention}!",
                 ephemeral=False
             )
 
-            # Создаём webhook и передаем его в VotingView
             webhook = await self.duel_view.duel_channel.create_webhook(name="Duel Voting")
             view = VotingView(
                 challenger=self.duel_view.challenger,
@@ -95,6 +102,7 @@ class AcceptDuelView(View):
                 color=discord.Color.gold()
             )
             await webhook.send(embed=embed, view=view)
+            logger.info(f"Создано голосование для дуэли {duel_id} через вебхук {webhook.id}")
 
     class DeclineButton(Button):
         def __init__(self, duel_view):
@@ -103,12 +111,16 @@ class AcceptDuelView(View):
 
         async def callback(self, interaction: discord.Interaction):
             if interaction.user.id != self.duel_view.opponent.id:
-                return await interaction.response.send_message("Только вызванный может отклонить вызов!", ephemeral=True)
+                await interaction.response.send_message("Только вызванный может отклонить вызов!", ephemeral=True)
+                logger.warning(f"{interaction.user} попытался отклонить чужую дуэль")
+                return
 
             await interaction.response.send_message(
                 f"{self.duel_view.opponent.mention} отклонил дуэль с {self.duel_view.challenger.mention}.",
                 ephemeral=False
             )
+            logger.info(f"{self.duel_view.opponent} отклонил дуэль с {self.duel_view.challenger}")
+
 
 class DuelSelectionView(View):
     def __init__(self, ctx):
@@ -127,24 +139,32 @@ class DuelSelectionView(View):
 
     async def duel_selected(self, interaction: discord.Interaction):
         if interaction.user != self.ctx.author:
-            return await interaction.response.send_message("Только инициатор может выбрать дуэль.", ephemeral=True)
+            await interaction.response.send_message("Только инициатор может выбрать дуэль.", ephemeral=True)
+            logger.warning(f"{interaction.user} попытался выбрать чужую дуэль")
+            return
 
         duel_id = self.select.values[0]
         duel = active_duels.get(duel_id)
         if not duel:
-            return await interaction.response.send_message("Дуэль не найдена.", ephemeral=True)
+            await interaction.response.send_message("Дуэль не найдена.", ephemeral=True)
+            logger.warning(f"Выбор несуществующей дуэли ID {duel_id}")
+            return
 
         guild = interaction.guild
         challenger = guild.get_member(duel["challenger_id"])
         opponent = guild.get_member(duel["opponent_id"])
         if not challenger or not opponent:
-            return await interaction.response.send_message("Один из участников больше не в сервере.", ephemeral=True)
+            await interaction.response.send_message("Один из участников больше не в сервере.", ephemeral=True)
+            logger.warning(f"Один из участников дуэли {duel_id} отсутствует на сервере")
+            return
 
         await interaction.response.send_message(
             f"Выбрана дуэль между {challenger.mention} и {opponent.mention}.\nКто победил?",
             view=WinnerButtonsView(duel_id),
             ephemeral=True
         )
+        logger.info(f"Дуэль {duel_id} выбрана для назначения победителя")
+
 
 class WinnerButtonsView(View):
     def __init__(self, duel_id):
@@ -168,7 +188,9 @@ class WinnerButtonsView(View):
         async def callback(self, interaction: discord.Interaction):
             duel = active_duels.pop(self.duel_id, None)
             if not duel:
-                return await interaction.response.send_message("Дуэль уже завершена.", ephemeral=True)
+                await interaction.response.send_message("Дуэль уже завершена.", ephemeral=True)
+                logger.warning(f"Попытка завершить уже завершённую дуэль {self.duel_id}")
+                return
 
             loser_id = duel["opponent_id"] if self.winner_id == duel["challenger_id"] else duel["challenger_id"]
             update_stats(self.winner_id, loser_id)
@@ -181,6 +203,8 @@ class WinnerButtonsView(View):
                 f"🎉 Победитель: {winner.mention if winner else self.winner_id}!\nПроигравший: {loser.mention if loser else loser_id}.",
                 ephemeral=False
             )
+            logger.success(f"Дуэль {self.duel_id} завершена: Победитель {winner}, Проигравший {loser}")
+
 
 async def setup(bot: commands.Bot):
     await load_data()

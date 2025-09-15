@@ -5,14 +5,15 @@ from discord.ext import commands
 from discord import Intents
 from config import load_config
 from logging_setup import setup_logging
+import data  # импортируем модуль с ленивым кэшем
 
+logger = logging.getLogger("main")
 
 def create_bot() -> commands.Bot:
     intents = Intents.default()
     intents.members = True
     intents.message_content = True
     return commands.Bot(command_prefix='/', intents=intents)
-
 
 async def load_cogs(bot: commands.Bot):
     cogs = [
@@ -23,34 +24,37 @@ async def load_cogs(bot: commands.Bot):
         "cogs.voting",
         "cogs.coinflip",
         "cogs.role_reactions",
-        "cogs.coinflip",
-        "cogs.invite",
+        "cogs.applications",
         "cogs.verification",
         "cogs.clan_info",
+        "cogs.info",
         "cogs.rps_cog",
         "cogs.admin",
-        "cogs.clan_general",  # убедись, что загружаешь только один раз
+        "cogs.clan_general",
     ]
 
     errors = []
     for cog in cogs:
         if cog in bot.extensions:
-            logging.info(f"Ког {cog} уже загружен, пропускаем")
+            logger.debug(f"Ког {cog} уже загружен, пропускаем")
             continue
         try:
             await bot.load_extension(cog)
         except Exception as e:
-            errors.append((cog, str(e)))
+            import traceback
+            errors.append((cog, traceback.format_exc()))
 
     if errors:
+        failed_cogs = ", ".join([c for c, _ in errors])
+        logger.critical(f"❌ Ошибки при загрузке модулей: {failed_cogs}")
         for cog, error in errors:
-            logging.error(f"⚠️ Ошибка при загрузке модуля `{cog}`: {error}")
+            logger.debug(f"Причина сбоя `{cog}`: {error}")
     else:
-        logging.info("✅ Все модули успешно загружены.")
+        logger.success("🎉 Все модули успешно загружены!")
 
 async def main():
-    setup_logging()
-    config = load_config()
+    config = load_config()          # 1. Загружаем конфиг
+    setup_logging(config)           # 2. Настраиваем логирование с GitHub-бэкапом
 
     token = config.get("DISCORD_TOKEN")
     if not token:
@@ -58,25 +62,31 @@ async def main():
 
     bot = create_bot()
 
+    # -------------------------------
+    # Важная правка: загружаем кэш из GitHub перед когами
+    await data.load_data()
+    logger.success("📂 Кэш данных (stats и active_duels) успешно загружен")
+    # -------------------------------
+
     @bot.event
     async def on_ready():
-        logging.info(f"✅ Бот `{bot.user}` успешно запущен (ID: {bot.user.id})")
+        logger.success(f"🤖 Бот `{bot.user}` успешно запущен (ID: {bot.user.id})")
         for guild in bot.guilds:
-            logging.info(f"🛡 Сервер: {guild.name} | ID: {guild.id} | Участников: {guild.member_count}")
+            logger.info(f"🛡 Сервер: {guild.name} | ID: {guild.id} | Участников: {guild.member_count}")
 
     await load_cogs(bot)
     try:
         await bot.start(token)
     except discord.LoginFailure:
-        logging.critical("❌ Неверный Discord токен.")
+        logger.critical("❌ Неверный Discord токен.")
     except Exception as e:
-        logging.critical(f"🔥 Критическая ошибка при запуске: {e}")
+        logger.critical(f"🔥 Критическая ошибка при запуске: {e}")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("🛑 Запуск остановлен вручную.")
+        logger.warning("🛑 Запуск остановлен вручную.")
     except Exception as e:
-        logging.critical(f"🚨 Неожиданная ошибка: {e}")
+        logger.critical(f"🚨 Неожиданная ошибка: {e}")

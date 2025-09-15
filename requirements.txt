@@ -2,3 +2,4 @@ discord.py
 PyNaCl
 PyGithub
 python-dotenv
+supabase
