@@ -2,20 +2,17 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime
 from supabase import create_client, Client
 import logging
-from config import load_config
 
-# Логгер
-logger = logging.getLogger("Applications")
+# Подключаем твой стильный логгер
+logger = logging.getLogger("StylishLogger")  # Используем уже настроенный логгер
 
 # Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Вопросы для заявок
 QUESTIONS = [
     "Какой стиль игры тебе ближе: агрессивный, стратегический, поддержка или что-то уникальное?",
     "Есть ли у тебя опыт командной работы? Как обычно решаешь конфликты в команде?",
@@ -34,7 +31,6 @@ QUESTIONS = [
     "Расскажи о самой эпичной победе в своей игровой истории."
 ]
 
-# Список колонок таблицы
 COLUMNS = [
     "Игроки",
     "Стиль игры",
@@ -55,22 +51,13 @@ COLUMNS = [
 ]
 
 def push_to_supabase(user_name, answers):
-    """
-    Сохраняет заявку в Supabase в таблицу 'applications'.
-    Работает с последней версией supabase-py (v2+)
-    """
     try:
         data = {col: ans for col, ans in zip(COLUMNS, [user_name] + answers)}
-
-        # Вставка в таблицу
         response = supabase.table("applications").insert(data).execute()
-
-        # В новых версиях SDK проверяем response.data
         if response.data:
-            logger.info(f"Заявка {user_name} успешно сохранена в Supabase")
+            logger.success(f"Заявка {user_name} успешно сохранена в Supabase")
         else:
             logger.error(f"Ошибка при сохранении заявки {user_name}: пустой ответ")
-
     except Exception as e:
         logger.error(f"Ошибка при подключении к Supabase: {e}")
 
@@ -81,12 +68,13 @@ class Applications(commands.Cog):
         self.MEMBER_ROLE_NAME = "💀Легион Проклятых🔥"
         self.OLD_ROLE_NAME = "🤝Друг клана🚩"
         self.active_applications = set()
+        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "Модератор"]
+        self.NOTIFY_ROLE_ID = 828749920411713588
 
     async def is_staff(self, interaction: discord.Interaction):
         if interaction.user.guild_permissions.administrator:
             return True
-        staff_role = discord.utils.get(interaction.guild.roles, name="Модератор")
-        if staff_role and staff_role in interaction.user.roles:
+        if any(discord.utils.get(interaction.guild.roles, name=role) in interaction.user.roles for role in self.STAFF_ROLES):
             return True
         raise app_commands.MissingPermissions(["administrator"])
 
@@ -102,28 +90,22 @@ class Applications(commands.Cog):
 
         try:
             answers = []
-            if isinstance(interaction.channel, discord.DMChannel) or interaction.guild is None:
-                channel = interaction.channel
-                await interaction.response.send_message(
-                    "📩 Я отправил тебе вопросы для заявки в этом чате!", ephemeral=True
+            try:
+                channel = await interaction.user.create_dm()
+            except discord.Forbidden:
+                self.active_applications.remove(user_id)
+                return await interaction.response.send_message(
+                    "❌ Не удалось отправить ЛС. Разрешите личные сообщения от участников сервера.",
+                    ephemeral=True
                 )
-            else:
-                try:
-                    channel = await interaction.user.create_dm()
-                except:
-                    self.active_applications.remove(user_id)
-                    return await interaction.response.send_message(
-                        "❌ Не удалось отправить ЛС. Разрешите личные сообщения от участников сервера.",
-                        ephemeral=True
-                    )
-                await interaction.response.send_message(
-                    "📩 Я отправил тебе личные сообщения с вопросами для заявки!", ephemeral=True
-                )
-                await channel.send("Привет! Начнём заполнение заявки. Ниже будут вопросы для тебя.")
 
-            # Задаём вопросы
+            await interaction.response.send_message(
+                "📩 Я отправил тебе личные сообщения с вопросами для заявки!", ephemeral=True
+            )
+            await channel.send("Привет! Начнём заполнение заявки. Ниже будут вопросы для тебя.")
+
             for question in QUESTIONS:
-                await channel.send(f"{question}")
+                await channel.send(question)
 
                 def check(m):
                     return m.author == interaction.user and isinstance(m.channel, discord.DMChannel)
@@ -132,10 +114,9 @@ class Applications(commands.Cog):
                     msg = await self.bot.wait_for('message', check=check, timeout=300)
                     answers.append(msg.content)
                 except:
-                    await channel.send("⏰ Время на ответ истекло. Пожалуйста, попробуй снова командой /заявка.")
+                    await channel.send("⏰ Время на ответ истекло. Попробуй снова командой /заявка.")
                     return
 
-            # Отправка заявки в канал Discord
             application_channel = self.bot.get_channel(self.APPLICATIONS_CHANNEL_ID)
             if not isinstance(application_channel, discord.TextChannel):
                 return await channel.send("❌ Ошибка: канал для заявок не настроен!")
@@ -156,29 +137,31 @@ class Applications(commands.Cog):
 
             await channel.send("✅ Ваша заявка отправлена на рассмотрение!")
 
-            # Уведомление администраторов
+            # Определяем guild
             guild = interaction.guild
+            if guild is None:
+                for g in self.bot.guilds:
+                    if g.get_member(interaction.user.id):
+                        guild = g
+                        break
+
             if guild:
-                try:
-                    async for member in guild.fetch_members(limit=None):
+                notify_role = guild.get_role(self.NOTIFY_ROLE_ID)
+                if notify_role:
+                    for member in notify_role.members:
                         if member.bot:
                             continue
-                        perms = member.guild_permissions
-                        if perms.administrator or perms.manage_guild or perms.manage_roles:
-                            try:
-                                dm_channel = member.dm_channel or await member.create_dm()
-                                await dm_channel.send(
-                                    f"📩 Новая заявка от {interaction.user.mention} готова к рассмотрению: {msg.jump_url}"
-                                )
-                                logger.info(f"Уведомление отправлено {member} с правами {perms}")
-                            except discord.Forbidden:
-                                logger.warning(f"Не удалось отправить ЛС {member}: запрещено писать пользователю")
-                            except Exception as e:
-                                logger.error(f"Ошибка при отправке ЛС {member}: {e}")
-                except Exception as e:
-                    logger.error(f"Ошибка при получении участников сервера: {e}")
+                        try:
+                            dm_channel = await member.create_dm()
+                            await dm_channel.send(
+                                f"📩 Новая заявка от {interaction.user.mention} готова к рассмотрению: {msg.jump_url}"
+                            )
+                            logger.info(f"Уведомление отправлено {member}")
+                        except discord.Forbidden:
+                            logger.warning(f"Не удалось отправить ЛС {member}")
+                        except Exception as e:
+                            logger.error(f"Ошибка при отправке ЛС {member}: {e}")
 
-            # Сохраняем заявку в Supabase
             push_to_supabase(str(interaction.user), answers)
 
         except Exception as e:
@@ -186,7 +169,6 @@ class Applications(commands.Cog):
             await interaction.response.send_message(
                 "❌ Произошла ошибка при отправке заявки.", ephemeral=True
             )
-
         finally:
             self.active_applications.discard(user_id)
 
@@ -207,9 +189,10 @@ class Applications(commands.Cog):
             message = await channel.fetch_message(payload.message_id)
             if not message.embeds:
                 return
-            if not (member.guild_permissions.administrator or 
-                   any(role.name == "Модератор" for role in member.roles)):
+
+            if not (member.guild_permissions.administrator or any(role.name in self.STAFF_ROLES for role in member.roles)):
                 return
+
             embed = message.embeds[0]
             if not embed.footer or not embed.footer.text:
                 return
@@ -223,8 +206,10 @@ class Applications(commands.Cog):
             target_member = guild.get_member(user_id)
             if not target_member:
                 return
+
             old_role = discord.utils.get(guild.roles, name=self.OLD_ROLE_NAME)
             new_role = discord.utils.get(guild.roles, name=self.MEMBER_ROLE_NAME)
+
             if str(payload.emoji) == '✅':
                 if old_role in target_member.roles:
                     await target_member.remove_roles(old_role)
@@ -233,16 +218,18 @@ class Applications(commands.Cog):
                 await message.delete()
                 try:
                     await target_member.send('🎉 Ваша заявка была одобрена! Добро пожаловать в клан!')
-                except:
-                    pass
+                    logger.success(f"Заявка одобрена: {target_member}")
+                except discord.Forbidden:
+                    logger.warning(f"Не удалось отправить ЛС {target_member}")
             elif str(payload.emoji) == '❌':
                 try:
                     await target_member.send('😕 Ваша заявка была отклонена модератором.')
-                except:
-                    pass
+                    logger.info(f"Заявка отклонена: {target_member}")
+                except discord.Forbidden:
+                    logger.warning(f"Не удалось отправить ЛС {target_member}")
+
         except Exception as e:
             logger.error(f"Ошибка в обработке реакций: {e}")
-
 
 async def setup(bot):
     await bot.add_cog(Applications(bot))
