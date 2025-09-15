@@ -30,7 +30,7 @@ class Info(commands.Cog):
                 return {}
             data = response.json()
             content = b64decode(data['content']).decode('utf-8')
-            logger.info("Данные с GitHub успешно загружены")
+            logger.success("Данные с GitHub успешно загружены")
             return json.loads(content)
         except Exception as e:
             logger.error(f"❌ Исключение при загрузке данных с GitHub: {e}")

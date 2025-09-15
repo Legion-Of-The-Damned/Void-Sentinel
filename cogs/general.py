@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 
 # --- Настройка логгера для этого кога ---
-logger = logging.getLogger("GeneralCog")
+logger = logging.getLogger("General")
 
 class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -17,13 +17,13 @@ class GeneralCommands(commands.Cog):
             try:
                 await self.bot.tree.sync()
                 self.synced = True
-                logger.info("✅ Slash-команды успешно синхронизированы")
+                logger.success("✅ Slash-команды успешно синхронизированы")
             except Exception as e:
                 logger.error(f"❌ Ошибка при синхронизации команд: {e}")
 
         try:
             await self.bot.change_presence(activity=discord.Game(name="Идут тех-работы"))
-            logger.info("Статус бота успешно изменён")
+            logger.success("Статус бота успешно изменён")
         except Exception as e:
             logger.warning(f"⚠️ Не удалось изменить статус: {e}")
 

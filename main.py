@@ -24,7 +24,7 @@ async def load_cogs(bot: commands.Bot):
         "cogs.voting",
         "cogs.coinflip",
         "cogs.role_reactions",
-        "cogs.invite",
+        "cogs.applications",
         "cogs.verification",
         "cogs.clan_info",
         "cogs.info",
