@@ -3,13 +3,18 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-from github import Github
+from supabase import create_client, Client
 import logging
 
-# Логгер для Applications
+# Логгер
 logger = logging.getLogger("Applications")
 
-# Список вопросов для вступления
+# Supabase
+SUPABASE_URL = ("https://jqphrrikzkntcyzsrbrc.supabase.co")
+SUPABASE_KEY = ("sb_secret_lIVKGhCjIqyeC9WmVO5Q-g_wZOqmUsv")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Вопросы для заявок
 QUESTIONS = [
     "Какой стиль игры тебе ближе: агрессивный, стратегический, поддержка или что-то уникальное?",
     "Есть ли у тебя опыт командной работы? Как обычно решаешь конфликты в команде?",
@@ -28,36 +33,45 @@ QUESTIONS = [
     "Расскажи о самой эпичной победе в своей игровой истории."
 ]
 
-def push_to_github(user_name, answers):
-    """Сохраняет заявку в репозиторий GitHub в папку applications/"""
-    token = os.getenv("MY_GITHUB_TOKEN")
-    repo_name = os.getenv("REPO_NAME", "Legion-Of-The-Damned/-VS-Data-Base")
-    
-    if not token:
-        logger.error("GitHub token не найден!")
-        return
-    
-    try:
-        g = Github(token)
-        repo = g.get_repo(repo_name)
-    except Exception as e:
-        logger.error(f"Ошибка подключения к GitHub: {e}")
-        return
-    
-    folder_path = "applications"
-    content = f"Пользователь: {user_name}\nДата: {datetime.utcnow()}\n\n"
-    # 🔹 Вопрос + ответ
-    for question, answer in zip(QUESTIONS, answers):
-        content += f"{question}\nОтвет: {answer}\n\n"
-    
-    file_name = f"{folder_path}/{user_name}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.txt"
-    
-    try:
-        repo.create_file(file_name, f"Новая заявка от {user_name}", content)
-        logger.success(f"Заявка {user_name} успешно загружена на GitHub в {file_name}")
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке на GitHub: {e}")
+# Список колонок таблицы
+COLUMNS = [
+    "Игроки",
+    "Стиль игры",
+    "Опыт командной работы",
+    "Получение информации",
+    "Время для клана",
+    "Стрессовые ситуации в играх",
+    "Одиначка или командный игрок",
+    "Восприятие критики",
+    "Ожидание от соклановцев",
+    "Время для матчей",
+    "Что страшнее",
+    "Цель вступления в клан",
+    "Место положения",
+    "Кем ты был бы",
+    "Новый позывной в клане",
+    "Самая эпичная победа в истории"
+]
 
+def push_to_supabase(user_name, answers):
+    """
+    Сохраняет заявку в Supabase в таблицу 'applications'.
+    Работает с последней версией supabase-py (v2+)
+    """
+    try:
+        data = {col: ans for col, ans in zip(COLUMNS, [user_name] + answers)}
+
+        # Вставка в таблицу
+        response = supabase.table("applications").insert(data).execute()
+
+        # В новых версиях SDK проверяем response.data
+        if response.data:
+            logger.info(f"Заявка {user_name} успешно сохранена в Supabase")
+        else:
+            logger.error(f"Ошибка при сохранении заявки {user_name}: пустой ответ")
+
+    except Exception as e:
+        logger.error(f"Ошибка при подключении к Supabase: {e}")
 
 class Applications(commands.Cog):
     def __init__(self, bot):
@@ -65,7 +79,7 @@ class Applications(commands.Cog):
         self.APPLICATIONS_CHANNEL_ID = 1362357361863295199
         self.MEMBER_ROLE_NAME = "💀Легион Проклятых🔥"
         self.OLD_ROLE_NAME = "🤝Друг клана🚩"
-        self.active_applications = set()  # 🔹 Активные заявки
+        self.active_applications = set()
 
     async def is_staff(self, interaction: discord.Interaction):
         if interaction.user.guild_permissions.administrator:
@@ -106,7 +120,7 @@ class Applications(commands.Cog):
                 )
                 await channel.send("Привет! Начнём заполнение заявки. Ниже будут вопросы для тебя.")
 
-            # Задаем вопросы
+            # Задаём вопросы
             for question in QUESTIONS:
                 await channel.send(f"{question}")
 
@@ -130,7 +144,7 @@ class Applications(commands.Cog):
                 description=f"**Пользователь:** {interaction.user.mention}",
                 color=discord.Color.blue()
             )
-            # 🔹 Вопрос + ответ в embed
+
             for question, answer in zip(QUESTIONS, answers):
                 embed.add_field(name=question, value=answer, inline=False)
             embed.set_footer(text=f"ID пользователя: {interaction.user.id}")
@@ -141,7 +155,7 @@ class Applications(commands.Cog):
 
             await channel.send("✅ Ваша заявка отправлена на рассмотрение!")
 
-            # 🔹 Отправляем уведомления в ЛС пользователям с правами
+            # Уведомление администраторов
             guild = interaction.guild
             if guild:
                 try:
@@ -163,7 +177,8 @@ class Applications(commands.Cog):
                 except Exception as e:
                     logger.error(f"Ошибка при получении участников сервера: {e}")
 
-            push_to_github(str(interaction.user), answers)
+            # Сохраняем заявку в Supabase
+            push_to_supabase(str(interaction.user), answers)
 
         except Exception as e:
             logger.error(f"Ошибка в команде заявка: {e}")
