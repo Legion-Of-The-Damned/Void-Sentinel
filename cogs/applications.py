@@ -5,13 +5,14 @@ from discord.ext import commands
 from datetime import datetime
 from supabase import create_client, Client
 import logging
+from config import load_config
 
 # Логгер
 logger = logging.getLogger("Applications")
 
 # Supabase
-SUPABASE_URL = ("https://jqphrrikzkntcyzsrbrc.supabase.co")
-SUPABASE_KEY = ("sb_secret_lIVKGhCjIqyeC9WmVO5Q-g_wZOqmUsv")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Вопросы для заявок
