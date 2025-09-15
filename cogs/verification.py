@@ -22,14 +22,17 @@ class Verification(commands.Cog):
 
     async def get_avatar_bytes(self, url):
         if not url:
+            logger.debug("Аватарка не указана, пропускаем загрузку")
             return None
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         return await resp.read()
+                    else:
+                        logger.debug(f"Аватарка недоступна (status {resp.status}) по URL {url}")
         except Exception as e:
-            logger.warning(f"Не удалось загрузить аватар: {e}")
+            logger.error(f"Ошибка при загрузке аватара: {e}")
         return None
 
     def save_message_id(self, msg_id):
@@ -47,6 +50,7 @@ class Verification(commands.Cog):
                 return json.load(open(self.msg_file, "r")).get("message_id")
             except Exception as e:
                 logger.error(f"Ошибка при чтении message_id: {e}")
+        logger.debug("Файл message_id не найден, нужно создать новое сообщение")
         return None
 
     @commands.Cog.listener()
@@ -63,7 +67,7 @@ class Verification(commands.Cog):
                 logger.success("Сообщение верификации найдено, создание не требуется.")
                 return
             except discord.NotFound:
-                logger.success("Сообщение было удалено, создаём новое.")
+                logger.info("Сообщение было удалено, создаём новое.")
             except Exception as e:
                 logger.error(f"Ошибка при получении сообщения: {e}")
                 msg_id = None
@@ -91,7 +95,7 @@ class Verification(commands.Cog):
             )
             await msg.add_reaction(self.verify_emoji)
             self.save_message_id(msg.id)
-            logger.info("Сообщение верификации создано и реакция добавлена.")  # INFO
+            logger.success("Сообщение верификации создано и реакция добавлена.")
         except Exception as e:
             logger.error(f"Ошибка при создании сообщения через вебхук: {e}")
 
@@ -122,17 +126,16 @@ class Verification(commands.Cog):
                 await member.add_roles(role)
                 logger.success(f"Роль {role.name} выдана пользователю {member}.")
 
-                # Отправка ЛС через 3 секунды
                 await asyncio.sleep(3)
                 try:
                     await member.send(
                         f"Привет, {member.display_name}! ✅ "
                         f"Вы успешно верифицированы на сервере.\n\n"
-                        f"Если вы хотите полноценно вступить в клан, введите команду `/заявка` и пройдите все вопросы."
+                        f"Если вы хотите полноценно вступить в клан, введите команду `/заявка`."
                     )
                     logger.info(f"Отправлено ЛС пользователю {member}.")
                 except discord.Forbidden:
-                    logger.warning(f"Не удалось отправить ЛС пользователю {member}. Он мог закрыть личку.")
+                    logger.debug(f"Не удалось отправить ЛС пользователю {member}. Он мог закрыть личку.")
             except discord.Forbidden:
                 logger.warning(f"Нет прав для выдачи роли {role.name} пользователю {member}.")
             except Exception as e:
@@ -147,10 +150,12 @@ class Verification(commands.Cog):
 
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
+            logger.debug(f"Сервер с ID {payload.guild_id} не найден при снятии роли")
             return
 
         member = guild.get_member(payload.user_id)
         if not member:
+            logger.debug(f"Участник с ID {payload.user_id} не найден при снятии роли")
             return
 
         role = guild.get_role(self.verified_role_id)

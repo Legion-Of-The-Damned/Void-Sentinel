@@ -3,8 +3,9 @@ import logging
 from discord.ext import commands
 import random
 
-# --- Настройка логгера для этого кога ---
+# --- Настройка логгера ---
 logger = logging.getLogger("CoinFlipCog")
+
 
 class CoinFlipButton(discord.ui.View):
     def __init__(self, challenger: discord.Member, opponent: discord.Member, bot, play_vs_bot=False, timeout=30):
@@ -42,7 +43,6 @@ class CoinFlipButton(discord.ui.View):
         logger.info(f"{interaction.user} выбрал {choice}")
 
         if self.play_vs_bot:
-            # Бот автоматически выбирает противоположное
             self.choices[self.bot.user.id] = "решка" if choice == "орёл" else "орёл"
             logger.info(f"{self.bot.user} автоматически выбрал {self.choices[self.bot.user.id]}")
             await self.reveal_result()
@@ -54,7 +54,7 @@ class CoinFlipButton(discord.ui.View):
         result_emoji = "🦅" if result == "орёл" else "💰"
 
         winner = None
-        if self.choices[self.challenger.id] != self.choices[self.opponent.id]:
+        if self.choices.get(self.challenger.id) != self.choices.get(self.opponent.id):
             for user_id, choice in self.choices.items():
                 if choice == result:
                     winner = user_id
@@ -64,14 +64,16 @@ class CoinFlipButton(discord.ui.View):
         if winner:
             if winner == self.challenger.id:
                 description += f"🎉 Побеждает {self.challenger.mention}!"
+                logger.success(f"{self.challenger} победил в игре Монетка ({result})")
             elif winner == self.bot.user.id:
                 description += f"🤖 Побеждает {self.bot.user.mention}!"
+                logger.success(f"{self.bot.user} победил в игре Монетка ({result})")
             else:
                 description += f"🎉 Победил <@{winner}>!"
-            logger.info(f"Результат броска: {result}, победитель ID {winner}")
+                logger.success(f"Победитель ID {winner} в игре Монетка ({result})")
         else:
             description += "⚖️ Ничья! У обоих одинаковый выбор."
-            logger.info(f"Результат броска: {result}, ничья")
+            logger.info(f"Ничья в игре Монетка: результат {result}")
 
         embed = discord.Embed(title="🎲 Монетка: Орёл или Решка", description=description, color=0xFFD700)
         for child in self.children:
@@ -80,6 +82,7 @@ class CoinFlipButton(discord.ui.View):
             await self.result_msg.edit(embed=embed, view=self)
         except Exception as e:
             logger.error(f"Ошибка при отправке результата броска: {e}")
+
 
 class CoinFlip(commands.Cog):
     def __init__(self, bot):
@@ -114,6 +117,7 @@ class CoinFlip(commands.Cog):
         msg = await ctx.send(embed=embed, view=view)
         view.result_msg = msg
         logger.info(f"Игра создана: {ctx.author} vs {opponent}, сообщение {msg.id}")
+
 
 async def setup(bot):
     await bot.add_cog(CoinFlip(bot))
