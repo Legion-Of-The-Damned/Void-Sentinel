@@ -1,5 +1,6 @@
 # ⚔️ Void Sentinel — Discord бот клана Legion Of The Damned
 
+[![Void Sentinel](https://github.com/Legion-Of-The-Damned/Void-Sentinel/raw/main/assets/banner.png)](https://github.com/Legion-Of-The-Damned/Void-Sentinel)
 
 *Защищая клан Legion Of The Damned от хаоса и беспорядка в Discord.*
 
