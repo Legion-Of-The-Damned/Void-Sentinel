@@ -34,7 +34,7 @@ jobs:
           PAYLOAD_FILE="payload.json"
 
           if [[ "${{ github.event_name }}" == "push" ]]; then
-            cat <<'EOF' > $PAYLOAD_FILE
+cat <<'EOF' > $PAYLOAD_FILE
 {
   "embeds": [{
     "title": "📦 Новый Push",
@@ -52,7 +52,7 @@ jobs:
 EOF
             sed -i "s/COLOR_PLACEHOLDER/$COLOR/" $PAYLOAD_FILE
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            cat <<'EOF' > $PAYLOAD_FILE
+cat <<'EOF' > $PAYLOAD_FILE
 {
   "embeds": [{
     "title": "💬 Pull Request ${{ github.event.action }}",
@@ -67,7 +67,7 @@ EOF
 EOF
             sed -i "s/COLOR_PLACEHOLDER/$COLOR/" $PAYLOAD_FILE
           elif [[ "${{ github.event_name }}" == "issues" ]]; then
-            cat <<'EOF' > $PAYLOAD_FILE
+cat <<'EOF' > $PAYLOAD_FILE
 {
   "embeds": [{
     "title": "📝 Issue ${{ github.event.action }}",
