@@ -14,74 +14,83 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: ✅ Checkout repository
         uses: actions/checkout@v4
+        continue-on-error: true  # даже если git не найдет репо, идем дальше
 
       - name: 🛰 Prepare Discord Message
         id: prepare
+        shell: bash
         run: |
-          # Определяем цвет embed по ветке
-          case "${{ github.ref_name }}" in
-            main) COLOR=3066993 ;;          # зелёный
-            develop|dev) COLOR=3447003 ;;   # синий
-            feature/*) COLOR=10181046 ;;    # фиолетовый
-            *) COLOR=15105570 ;;            # серый по умолчанию
-          esac
+          set -e
+          echo "GitHub event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref_name }}"
+
+          COLOR=15105570
+          if [[ "${{ github.ref_name }}" == "main" ]]; then COLOR=3066993; fi
+          if [[ "${{ github.ref_name }}" =~ ^(dev|develop)$ ]]; then COLOR=3447003; fi
           echo "color=$COLOR" >> $GITHUB_OUTPUT
 
-          # Формируем JSON payload
-          if [ "${{ github.event_name }}" == "push" ]; then
-            cat <<EOF > payload.json
-            {
-              "embeds": [{
-                "title": "📦 Новый Push в репозиторий",
-                "color": $COLOR,
-                "fields": [
-                  { "name": "Репозиторий", "value": "${{ github.repository }}", "inline": true },
-                  { "name": "Ветка", "value": "${{ github.ref_name }}", "inline": true },
-                  { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
-                  { "name": "Сообщение", "value": "${{ github.event.head_commit.message }}" }
-                ],
-                "url": "${{ github.event.head_commit.url }}",
-                "footer": { "text": "GitHub Actions • Push Event" }
-              }]
-            }
-            EOF
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            cat <<EOF > payload.json
-            {
-              "embeds": [{
-                "title": "💬 Pull Request ${{ github.event.action }}",
-                "color": $COLOR,
-                "fields": [
-                  { "name": "PR", "value": "[#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})", "inline": true },
-                  { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
-                  { "name": "Название", "value": "${{ github.event.pull_request.title }}" }
-                ],
-                "footer": { "text": "GitHub Actions • PR Event" }
-              }]
-            }
-            EOF
-          elif [ "${{ github.event_name }}" == "issues" ]; then
-            cat <<EOF > payload.json
-            {
-              "embeds": [{
-                "title": "📝 Issue ${{ github.event.action }}",
-                "color": $COLOR,
-                "fields": [
-                  { "name": "Issue", "value": "[#${{ github.event.issue.number }}](${{ github.event.issue.html_url }})", "inline": true },
-                  { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
-                  { "name": "Название", "value": "${{ github.event.issue.title }}" }
-                ],
-                "footer": { "text": "GitHub Actions • Issue Event" }
-              }]
-            }
-            EOF
-          fi
+          PAYLOAD_FILE="payload.json"
+
+          case "${{ github.event_name }}" in
+            push)
+              cat <<EOF > $PAYLOAD_FILE
+              {
+                "embeds": [{
+                  "title": "📦 Новый Push",
+                  "color": $COLOR,
+                  "fields": [
+                    { "name": "Репозиторий", "value": "${{ github.repository }}", "inline": true },
+                    { "name": "Ветка", "value": "${{ github.ref_name }}", "inline": true },
+                    { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+                    { "name": "Коммит", "value": "${{ github.event.head_commit.message || 'N/A' }}" }
+                  ],
+                  "url": "${{ github.event.head_commit.url || github.server_url }}",
+                  "footer": { "text": "GitHub Actions • Push Event" }
+                }]
+              }
+              EOF
+              ;;
+            pull_request)
+              cat <<EOF > $PAYLOAD_FILE
+              {
+                "embeds": [{
+                  "title": "💬 Pull Request ${{ github.event.action }}",
+                  "color": $COLOR,
+                  "fields": [
+                    { "name": "PR", "value": "[#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})", "inline": true },
+                    { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+                    { "name": "Название", "value": "${{ github.event.pull_request.title }}" }
+                  ]
+                }]
+              }
+              EOF
+              ;;
+            issues)
+              cat <<EOF > $PAYLOAD_FILE
+              {
+                "embeds": [{
+                  "title": "📝 Issue ${{ github.event.action }}",
+                  "color": $COLOR,
+                  "fields": [
+                    { "name": "Issue", "value": "[#${{ github.event.issue.number }}](${{ github.event.issue.html_url }})", "inline": true },
+                    { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+                    { "name": "Название", "value": "${{ github.event.issue.title }}" }
+                  ]
+                }]
+              }
+              EOF
+              ;;
+          esac
 
       - name: 💌 Send to Discord
         run: |
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d @payload.json \
-               "${{ secrets.DISCORD_WEBHOOK_URL }}"
+          if [ -f payload.json ]; then
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d @payload.json \
+                 "${{ secrets.DISCORD_WEBHOOK_URL }}"
+          else
+            echo "⚠️ No payload.json found — skipping Discord notification."
+          fi
