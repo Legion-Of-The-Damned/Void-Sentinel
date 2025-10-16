@@ -1,0 +1,16 @@
+name: Discord Push Notification
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord notification
+        uses: b4dnewz/discord-action@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          message: "📢 Пуш от ${{ github.actor }} в ветку ${{ github.ref }}!"
