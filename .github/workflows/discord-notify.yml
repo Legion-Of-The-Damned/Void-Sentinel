@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: ✅ Checkout repository
         uses: actions/checkout@v4
-        continue-on-error: true  # даже если git не найдет репо, идем дальше
+        continue-on-error: true
 
       - name: 🛰 Prepare Discord Message
         id: prepare
@@ -33,56 +33,55 @@ jobs:
 
           PAYLOAD_FILE="payload.json"
 
-          case "${{ github.event_name }}" in
-            push)
-              cat <<EOF > $PAYLOAD_FILE
-              {
-                "embeds": [{
-                  "title": "📦 Новый Push",
-                  "color": $COLOR,
-                  "fields": [
-                    { "name": "Репозиторий", "value": "${{ github.repository }}", "inline": true },
-                    { "name": "Ветка", "value": "${{ github.ref_name }}", "inline": true },
-                    { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
-                    { "name": "Коммит", "value": "${{ github.event.head_commit.message || 'N/A' }}" }
-                  ],
-                  "url": "${{ github.event.head_commit.url || github.server_url }}",
-                  "footer": { "text": "GitHub Actions • Push Event" }
-                }]
-              }
-              EOF
-              ;;
-            pull_request)
-              cat <<EOF > $PAYLOAD_FILE
-              {
-                "embeds": [{
-                  "title": "💬 Pull Request ${{ github.event.action }}",
-                  "color": $COLOR,
-                  "fields": [
-                    { "name": "PR", "value": "[#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})", "inline": true },
-                    { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
-                    { "name": "Название", "value": "${{ github.event.pull_request.title }}" }
-                  ]
-                }]
-              }
-              EOF
-              ;;
-            issues)
-              cat <<EOF > $PAYLOAD_FILE
-              {
-                "embeds": [{
-                  "title": "📝 Issue ${{ github.event.action }}",
-                  "color": $COLOR,
-                  "fields": [
-                    { "name": "Issue", "value": "[#${{ github.event.issue.number }}](${{ github.event.issue.html_url }})", "inline": true },
-                    { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
-                    { "name": "Название", "value": "${{ github.event.issue.title }}" }
-                  ]
-                }]
-              }
-              EOF
-              ;;
-          esac
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            cat <<'EOF' > $PAYLOAD_FILE
+{
+  "embeds": [{
+    "title": "📦 Новый Push",
+    "color": COLOR_PLACEHOLDER,
+    "fields": [
+      { "name": "Репозиторий", "value": "${{ github.repository }}", "inline": true },
+      { "name": "Ветка", "value": "${{ github.ref_name }}", "inline": true },
+      { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+      { "name": "Коммит", "value": "${{ github.event.head_commit.message || 'N/A' }}" }
+    ],
+    "url": "${{ github.event.head_commit.url || github.server_url }}",
+    "footer": { "text": "GitHub Actions • Push Event" }
+  }]
+}
+EOF
+            sed -i "s/COLOR_PLACEHOLDER/$COLOR/" $PAYLOAD_FILE
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            cat <<'EOF' > $PAYLOAD_FILE
+{
+  "embeds": [{
+    "title": "💬 Pull Request ${{ github.event.action }}",
+    "color": COLOR_PLACEHOLDER,
+    "fields": [
+      { "name": "PR", "value": "[#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})", "inline": true },
+      { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+      { "name": "Название", "value": "${{ github.event.pull_request.title }}" }
+    ]
+  }]
+}
+EOF
+            sed -i "s/COLOR_PLACEHOLDER/$COLOR/" $PAYLOAD_FILE
+          elif [[ "${{ github.event_name }}" == "issues" ]]; then
+            cat <<'EOF' > $PAYLOAD_FILE
+{
+  "embeds": [{
+    "title": "📝 Issue ${{ github.event.action }}",
+    "color": COLOR_PLACEHOLDER,
+    "fields": [
+      { "name": "Issue", "value": "[#${{ github.event.issue.number }}](${{ github.event.issue.html_url }})", "inline": true },
+      { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+      { "name": "Название", "value": "${{ github.event.issue.title }}" }
+    ]
+  }]
+}
+EOF
+            sed -i "s/COLOR_PLACEHOLDER/$COLOR/" $PAYLOAD_FILE
+          fi
 
       - name: 💌 Send to Discord
         run: |
