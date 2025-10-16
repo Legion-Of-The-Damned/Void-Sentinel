@@ -3,7 +3,7 @@ name: 🛰 Discord Notifications
 on:
   push:
     branches:
-      - master  # или "main", если у тебя так называется главная ветка
+      - main  # или "main", если у тебя так называется главная ветка
   pull_request:
     types: [opened, closed, merged]
 
