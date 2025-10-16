@@ -3,7 +3,8 @@ name: 🛰 Discord Notifications
 on:
   push:
     branches:
-      - '**'
+      - main
+      - develop
   pull_request:
     types: [opened, closed, merged]
 
