@@ -1,23 +1,42 @@
-name: Discord Notification on Push
+name: 🛰 Discord Notifications
 
 on:
   push:
     branches:
-      - main  # или main, если твоя ветка называется main
+      - master  # или "main", если у тебя так называется главная ветка
+  pull_request:
+    types: [opened, closed, merged]
 
 jobs:
   notify:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send Discord notification
+      - name: 📦 Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 📨 Send Discord message
+        uses: Ilshidur/action-discord@master
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_USERNAME: OSS 117
-        uses: Ilshidur/action-discord@master
+          DISCORD_AVATAR: https://resize.programme-television.ladmedia.fr/r/670,670/img/var/premiere/storage/images/tele-7-jours/news-tv/oss-117-le-caire-nid-d-espions-c8-le-show-de-jean-dujardin-4484285/90175763-1-fre-FR/OSS-117-Le-Caire-nid-d-espions-C8-Le-show-de-Jean-Dujardin.jpg
         with:
           args: |
-            📢 **Новый пуш!**
+            **🚀 Репозиторий:** ${{ github.repository }}
+            **👤 Автор:** ${{ github.actor }}
+            **🌿 Ветка:** ${{ github.ref_name }}
+            **📝 Коммит:** ${{ github.event.head_commit.message }}
+            🔗 [Открыть коммит](${{ github.event.head_commit.url }})
+
+      - name: 💬 Notify about PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        with:
+          args: |
+            🎯 **Pull Request ${{ github.event.action }}!**
+            📦 [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})
             🧑 Автор: ${{ github.actor }}
-            📝 Коммит: ${{ github.event.head_commit.message }}
-            🔗 [Посмотреть коммит](${{ github.event.head_commit.url }})
+            📝 Название: ${{ github.event.pull_request.title }}
