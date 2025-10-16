@@ -1,10 +1,9 @@
-name: 🛰 Discord Notifications
+name: 🛰 Discord Notifications Pro
 
-# Триггеры
 on:
   push:
     branches:
-      - '**'  # все ветки
+      - '**'
   pull_request:
     types: [opened, closed, merged]
   issues:
@@ -15,46 +14,74 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout (нужно для github.event.head_commit и других данных)
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Push уведомление
-      - name: 📨 Discord Push Notification
-        if: github.event_name == 'push'
-        uses: Ilshidur/action-discord@master
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        with:
-          args: |
-            📢 **Push в репозиторий** `${{ github.repository }}`
-            🧑 Автор: `${{ github.actor }}`
-            🌿 Ветка: `${{ github.ref_name }}`
-            📝 Сообщение коммита: `${{ github.event.head_commit.message }}`
-            🔗 [Смотреть коммит](${{ github.event.head_commit.url }})
+      - name: 🛰 Prepare Discord Message
+        id: prepare
+        run: |
+          # Определяем цвет embed по ветке
+          case "${{ github.ref_name }}" in
+            main) COLOR=3066993 ;;          # зелёный
+            develop|dev) COLOR=3447003 ;;   # синий
+            feature/*) COLOR=10181046 ;;    # фиолетовый
+            *) COLOR=15105570 ;;            # серый по умолчанию
+          esac
+          echo "color=$COLOR" >> $GITHUB_OUTPUT
 
-      # Pull Request уведомление
-      - name: 💬 Discord PR Notification
-        if: github.event_name == 'pull_request'
-        uses: Ilshidur/action-discord@master
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        with:
-          args: |
-            🎯 **Pull Request ${{ github.event.action }}**
-            📦 [#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})
-            🧑 Автор: `${{ github.actor }}`
-            📝 Название PR: `${{ github.event.pull_request.title }}`
+          # Формируем JSON payload
+          if [ "${{ github.event_name }}" == "push" ]; then
+            cat <<EOF > payload.json
+            {
+              "embeds": [{
+                "title": "📦 Новый Push в репозиторий",
+                "color": $COLOR,
+                "fields": [
+                  { "name": "Репозиторий", "value": "${{ github.repository }}", "inline": true },
+                  { "name": "Ветка", "value": "${{ github.ref_name }}", "inline": true },
+                  { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+                  { "name": "Сообщение", "value": "${{ github.event.head_commit.message }}" }
+                ],
+                "url": "${{ github.event.head_commit.url }}",
+                "footer": { "text": "GitHub Actions • Push Event" }
+              }]
+            }
+            EOF
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            cat <<EOF > payload.json
+            {
+              "embeds": [{
+                "title": "💬 Pull Request ${{ github.event.action }}",
+                "color": $COLOR,
+                "fields": [
+                  { "name": "PR", "value": "[#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})", "inline": true },
+                  { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+                  { "name": "Название", "value": "${{ github.event.pull_request.title }}" }
+                ],
+                "footer": { "text": "GitHub Actions • PR Event" }
+              }]
+            }
+            EOF
+          elif [ "${{ github.event_name }}" == "issues" ]; then
+            cat <<EOF > payload.json
+            {
+              "embeds": [{
+                "title": "📝 Issue ${{ github.event.action }}",
+                "color": $COLOR,
+                "fields": [
+                  { "name": "Issue", "value": "[#${{ github.event.issue.number }}](${{ github.event.issue.html_url }})", "inline": true },
+                  { "name": "Автор", "value": "${{ github.actor }}", "inline": true },
+                  { "name": "Название", "value": "${{ github.event.issue.title }}" }
+                ],
+                "footer": { "text": "GitHub Actions • Issue Event" }
+              }]
+            }
+            EOF
+          fi
 
-      # Issue уведомление
-      - name: 📝 Discord Issue Notification
-        if: github.event_name == 'issues'
-        uses: Ilshidur/action-discord@master
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        with:
-          args: |
-            🆕 **Issue ${{ github.event.action }}**
-            📝 [#${{ github.event.issue.number }}](${{ github.event.issue.html_url }})
-            🧑 Автор: `${{ github.actor }}`
-            📝 Название: ${{ github.event.issue.title }}   
+      - name: 💌 Send to Discord
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d @payload.json \
+               "${{ secrets.DISCORD_WEBHOOK_URL }}"
