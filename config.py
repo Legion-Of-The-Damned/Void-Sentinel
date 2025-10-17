@@ -60,6 +60,8 @@ def load_config():
         "FRIEND_ROLE_ID": getenv_int("FRIEND_ROLE_ID"),
         "GITHUB_TOKEN": os.getenv("MY_GITHUB_TOKEN"),
         "REPO_NAME": os.getenv("REPO_NAME", "Legion-Of-The-Damned/-VS-Data-Base"),
+        "SUPABASE_URL ": os.getenv("SUPABASE_URL"),
+        "SUPABASE_KEY": os.getenv("SUPABASE_KEY"),
 
         "QUIZ_QUESTIONS_PATH": "quiz_questions.json"
     }

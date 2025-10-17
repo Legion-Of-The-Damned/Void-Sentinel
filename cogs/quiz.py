@@ -1,39 +1,51 @@
+import os
 import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import View, Select, Button
 import random
-import aiohttp
-import json
 import logging
+import asyncio
 from config import load_config
+from supabase import create_client, Client
 
 CONFIG = load_config()
 logger = logging.getLogger("QuizCog")
 
-async def fetch_questions_from_github():
-    url = f"https://raw.githubusercontent.com/{CONFIG['REPO_NAME']}/main/{CONFIG['QUIZ_QUESTIONS_PATH']}"
-    headers = {}
-    if CONFIG.get("GITHUB_TOKEN"):
-        headers["Authorization"] = f"token {CONFIG['GITHUB_TOKEN']}"
-        headers["Accept"] = "application/vnd.github.v3.raw"
+# Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as resp:
-            raw_text = await resp.text()
-            if resp.status == 200:
-                try:
-                    data = json.loads(raw_text)
-                    valid_questions = [q for q in data if all(k in q for k in ("category", "question", "options", "answer"))]
-                    logger.info(f"✅ Загружено {len(valid_questions)} вопросов из GitHub")
-                    return valid_questions
-                except json.JSONDecodeError as e:
-                    logger.error(f"❌ Ошибка при разборе JSON: {e}")
-                    return []
-            else:
-                logger.error(f"❌ Ошибка загрузки с GitHub: HTTP {resp.status}")
-                return []
+async def fetch_questions_from_supabase():
+    try:
+        # Синхронный вызов execute в отдельном потоке
+        response = await asyncio.to_thread(lambda: supabase.table("quiz_questions").select("*").execute())
 
+        data = response.data  # тут уже список записей
+        if not data:
+            logger.error("❌ Данных из Supabase нет.")
+            return []
+
+        valid_questions = []
+        for q in data:
+            if all(k in q for k in ("Категория", "вопрос", "вариант_1", "вариант_2", "вариант_3", "вариант_4", "ответ")):
+                q_dict = {
+                    "category": q["Категория"],
+                    "question": q["вопрос"],
+                    "options": [q["вариант_1"], q["вариант_2"], q["вариант_3"], q["вариант_4"]],
+                    "answer": int(q["ответ"])
+                }
+                valid_questions.append(q_dict)
+
+        logger.info(f"✅ Загружено {len(valid_questions)} вопросов из Supabase")
+        return valid_questions
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при получении данных из Supabase: {e}")
+        return []
+
+# --- QuizView, CategorySelect, CategoryView остаются без изменений ---
 class QuizView(View):
     def __init__(self, question_data):
         super().__init__(timeout=None)
@@ -80,7 +92,7 @@ class CategorySelect(Select):
         embed = discord.Embed(
             title="🧠 Вопрос Викторины",
             description=f"**Категория:** `{question['category']}`\n\n{question['question']}\n\n{options_text}",
-            color=discord.Color.purple()
+            color=discord.Color.red()
         )
         embed.set_footer(text="Нажмите кнопку ниже, чтобы выбрать ответ.")
         avatar_url = CONFIG.get("AVATAR_URL")
@@ -102,7 +114,7 @@ class QuizCog(commands.Cog):
 
     @app_commands.command(name="викторина", description="Выберите категорию для начала викторины")
     async def quiz(self, interaction: discord.Interaction):
-        questions = await fetch_questions_from_github()
+        questions = await fetch_questions_from_supabase()
         if not questions:
             await interaction.response.send_message("❌ Вопросы не найдены или повреждены.", ephemeral=True)
             logger.error(f"{interaction.user} попытался запустить викторину, но вопросы не найдены")
