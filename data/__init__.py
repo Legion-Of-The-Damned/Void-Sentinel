@@ -1,10 +1,11 @@
 from .data import (
-    active_duels,
-    save_active_duels,
-    update_stats,
-    load_data,
     stats,
+    active_duels,
     get_stats,
     get_active_duels,
-    save_stats  # если нужна функция сохранения stats
+    update_stats,
+    save_active_duels,
+    load_data,
+    key_from_name,  # <-- добавляем сюда
+
 )
