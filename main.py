@@ -62,12 +62,6 @@ async def main():
 
     bot = create_bot()
 
-    # -------------------------------
-    # Важная правка: загружаем кэш из GitHub перед когами
-    await data.load_data()
-    logger.success("📂 Кэш данных (stats и active_duels) успешно загружен")
-    # -------------------------------
-
     @bot.event
     async def on_ready():
         logger.success(f"🤖 Бот `{bot.user}` успешно запущен (ID: {bot.user.id})")
