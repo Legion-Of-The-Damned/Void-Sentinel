@@ -1,23 +1,29 @@
 import discord
 import logging
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 import platform
 import psutil
+import asyncio
+from datetime import datetime, timedelta
 
 # --- Настройка логгера ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(message)s"
 )
-logger = logging.getLogger("discord")  # используем общий логгер
+logger = logging.getLogger("discord")
 
-BOT_VERSION = "3.0"  # версия бота
+BOT_VERSION = "3.0"  # обновленная версия с напоминаниями
+
+# Словарь для хранения напоминаний в формате {user_id: [(time, message), ...]}
+user_reminders = {}
 
 class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.synced = False
+        self.check_reminders.start()  # запуск фоновой проверки напоминаний
 
     # --- Событие готовности ---
     @commands.Cog.listener()
@@ -62,14 +68,16 @@ class GeneralCommands(commands.Cog):
                 ":one: :one: `/викторина` — пройти викторину\n"
                 ":one: :two: `/монетка` — подбросить монетку (орёл/решка)\n"
                 ":one: :three: `/камень_ножницы_бумага` — сыграть в игру КНБ\n\n"
+                ":memo: **Личные заметки:**\n"
+                ":one: :four: `/напомни [время в минутах] [текст]` — создать напоминание\n\n"
                 ":rotating_light: **Административные команды:**\n"
-                ":one: :four: `/победа` — зафиксировать победу\n"
-                ":one: :five: `/изгнание` — изгнать из клана и назначить роль 'Друг клана'\n"
-                ":one: :six: `/бан @участник` — забанить участника\n"
-                ":one: :seven: `/разбан [ID пользователя]` — разбанить участника\n"
-                ":one: :eight: `/кик @участник` — кикнуть участника\n"
-                ":one: :nine: `/мут @участник [минуты]` — выдать мут\n"
-                ":two: :zero: `/размут @участник` — снять мут\n"
+                ":one: :five: `/победа` — зафиксировать победу\n"
+                ":one: :six: `/изгнание` — изгнать из клана и назначить роль 'Друг клана'\n"
+                ":one: :seven: `/бан @участник` — забанить участника\n"
+                ":one: :eight: `/разбан [ID пользователя]` — разбанить участника\n"
+                ":one: :nine: `/кик @участник` — кикнуть участника\n"
+                ":one: :zero: `/мут @участник [минуты]` — выдать мут\n"
+                ":two: :one: `/размут @участник` — снять мут\n"
             ),
             color=discord.Color.red()
         )
@@ -77,7 +85,7 @@ class GeneralCommands(commands.Cog):
         await interaction.response.send_message(embed=embed)
         logger.info(f"📖 /помощь | Пользователь: {interaction.user} | Сервер: {interaction.guild.name if interaction.guild else 'ЛС'}")
 
-    # --- Команда расширенного пинга ---
+    # --- Команда пинга ---
     @app_commands.command(name="пинг", description="Проверка состояния бота")
     async def ping(self, interaction):
         latency_ms = round(self.bot.latency * 1000)
@@ -104,6 +112,39 @@ class GeneralCommands(commands.Cog):
             f"Ping: {latency_ms} ms | RAM: {ram_usage_mb:.2f} MB | CPU: {cpu_usage_percent:.1f}% | "
             f"Версия бота: {BOT_VERSION}"
         )
+
+    # --- Команда напоминаний ---
+    @app_commands.command(name="напомни", description="Создать личное напоминание")
+    @app_commands.describe(minutes="Через сколько минут напомнить", message="Текст напоминания")
+    async def remind(self, interaction: discord.Interaction, minutes: int, message: str):
+        remind_time = datetime.utcnow() + timedelta(minutes=minutes)
+        user_id = interaction.user.id
+        user_reminders.setdefault(user_id, []).append((remind_time, message))
+        await interaction.response.send_message(
+            f"⏰ Напоминание установлено через {minutes} минут: {message}", ephemeral=True
+        )
+        logger.info(f"⏰ /напомни | Пользователь: {interaction.user} | Через: {minutes} мин | Сообщение: {message}")
+
+    # --- Фоновая проверка напоминаний ---
+    @tasks.loop(seconds=30)
+    async def check_reminders(self):
+        now = datetime.utcnow()
+        for user_id, reminders in list(user_reminders.items()):
+            for remind_time, message in reminders:
+                if now >= remind_time:
+                    user = self.bot.get_user(user_id)
+                    if user:
+                        try:
+                            await user.send(f"🔔 Напоминание: {message}")
+                        except Exception as e:
+                            logger.warning(f"Не удалось отправить напоминание пользователю {user_id}: {e}")
+                    reminders.remove((remind_time, message))
+            if not reminders:
+                user_reminders.pop(user_id, None)
+
+    @check_reminders.before_loop
+    async def before_check_reminders(self):
+        await self.bot.wait_until_ready()
 
 # --- Функция setup ---
 async def setup(bot: commands.Bot):
