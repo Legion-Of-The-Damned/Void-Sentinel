@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 from discord.ui import View, Button
 
-logger = logging.getLogger("RPSCog")
+logger = logging.getLogger("RPS")
 duel_lock = asyncio.Lock()
 
 # === Константы ===
