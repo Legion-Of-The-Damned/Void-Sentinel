@@ -12,6 +12,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("discord")  # используем общий логгер
 
+BOT_VERSION = "3.0"  # версия бота
+
 class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -36,7 +38,7 @@ class GeneralCommands(commands.Cog):
 
     # --- Команда помощи ---
     @app_commands.command(name="помощь", description="Показывает список доступных команд")
-    async def help_command(self, interaction: discord.Interaction):
+    async def help_command(self, interaction):
         wins = getattr(self.bot, 'total_duel_wins', "N/A")
         losses = getattr(self.bot, 'total_duel_losses', "N/A")
 
@@ -49,23 +51,25 @@ class GeneralCommands(commands.Cog):
                 ":two: Уведомление об уходе\n"
                 ":three: `/помощь` — показать команды\n"
                 ":four: `/состав_клана` — показать участников\n"
-                ":five: `/информация_о_сервере` — посмотреть информацию о сервере с выбором категории\n\n"
+                ":five: `/информация_о_сервере` — посмотреть информацию о сервере с выбором категории\n"
+                ":six: `/пинг` — проверить статус бота и его ресурсы\n"
+                ":seven: `/заявка` — заполнить анкету для вступления в клан\n\n"
                 "⚔ **Боевые команды:**\n"
-                ":six: `/дуэль` — вызвать бой\n"
-                ":seven: `/статистика` — посмотреть рейтинг\n"
-                ":eight: `/общая_статистика` — общая статистика дуэлей\n\n"
+                ":eight: `/дуэль` — вызвать бой\n"
+                ":nine: `/статистика` — посмотреть рейтинг\n"
+                ":one: :zero: `/общая_статистика` — общая статистика дуэлей\n\n"
                 ":game_die: **Игровые мини-игры:**\n"
-                ":nine: `/викторина` — пройти викторину\n"
-                ":keycap_ten: `/монетка` — подбросить монетку (орёл/решка)\n"
-                ":one: :one: `/камень_ножницы_бумага` — сыграть в игру КНБ\n\n"
+                ":one: :one: `/викторина` — пройти викторину\n"
+                ":one: :two: `/монетка` — подбросить монетку (орёл/решка)\n"
+                ":one: :three: `/камень_ножницы_бумага` — сыграть в игру КНБ\n\n"
                 ":rotating_light: **Административные команды:**\n"
-                ":one: :two: `/победа` — зафиксировать победу\n"
-                ":one: :three: `/изгнание` — изгнать из клана и назначить роль 'Друг клана'\n"
-                ":one: :four: `/бан @участник` — забанить участника\n"
-                ":one: :five: `/разбан [ID пользователя]` — разбанить участника\n"
-                ":one: :six: `/кик @участник` — кикнуть участника\n"
-                ":one: :seven: `/мут @участник [минуты]` — выдать мут\n"
-                ":one: :eight: `/размут @участник` — снять мут\n"
+                ":one: :four: `/победа` — зафиксировать победу\n"
+                ":one: :five: `/изгнание` — изгнать из клана и назначить роль 'Друг клана'\n"
+                ":one: :six: `/бан @участник` — забанить участника\n"
+                ":one: :seven: `/разбан [ID пользователя]` — разбанить участника\n"
+                ":one: :eight: `/кик @участник` — кикнуть участника\n"
+                ":one: :nine: `/мут @участник [минуты]` — выдать мут\n"
+                ":two: :zero: `/размут @участник` — снять мут\n"
             ),
             color=discord.Color.red()
         )
@@ -75,32 +79,31 @@ class GeneralCommands(commands.Cog):
 
     # --- Команда расширенного пинга ---
     @app_commands.command(name="пинг", description="Проверка состояния бота")
-    async def ping(self, interaction: discord.Interaction):
-        # Задержка
+    async def ping(self, interaction):
         latency_ms = round(self.bot.latency * 1000)
-
-        # Версия Python
         python_version = platform.python_version()
-
-        # Использование ресурсов
         process = psutil.Process()
-        ram_usage_mb = process.memory_info().rss / 1024 / 1024  # в МБ
-        cpu_usage_percent = psutil.cpu_percent(interval=0.5)  # за полсекунды
+        ram_usage_mb = process.memory_info().rss / 1024 / 1024
+        cpu_usage_percent = psutil.cpu_percent(interval=0.5)
 
-        # Формируем embed
         embed = discord.Embed(
             title="📊 Статистика бота",
-            color=discord.Color.green()
+            color=discord.Color.red()
         )
-        embed.add_field(name="Задержка", value=f"`{latency_ms} ms`", inline=True)
-        embed.add_field(name="Python", value=f"`{python_version}`", inline=True)
-        embed.add_field(name="Использование RAM", value=f"`{ram_usage_mb:.2f} MB`", inline=True)
-        embed.add_field(name="Использование CPU", value=f"`{cpu_usage_percent:.1f}%`", inline=True)
+        embed.add_field(name="Задержка", value=f"{latency_ms} ms", inline=True)
+        embed.add_field(name="Python", value=python_version, inline=True)
+        embed.add_field(name="Версия бота", value=BOT_VERSION, inline=True)
+        embed.add_field(name="Использование RAM", value=f"{ram_usage_mb:.2f} MB", inline=True)
+        embed.add_field(name="Использование CPU", value=f"{cpu_usage_percent:.1f}%", inline=True)
 
         await interaction.response.send_message(embed=embed)
 
-        # --- Лог одной строкой ---
-        logger.info(f"📶 /пинг | Пользователь: {interaction.user} | Сервер: {interaction.guild.name if interaction.guild else 'ЛС'} | Ping: {latency_ms} ms | RAM: {ram_usage_mb:.2f} MB | CPU: {cpu_usage_percent:.1f}%")
+        logger.info(
+            f"📶 /пинг | Пользователь: {interaction.user} | "
+            f"Сервер: {interaction.guild.name if interaction.guild else 'ЛС'} | "
+            f"Ping: {latency_ms} ms | RAM: {ram_usage_mb:.2f} MB | CPU: {cpu_usage_percent:.1f}% | "
+            f"Версия бота: {BOT_VERSION}"
+        )
 
 # --- Функция setup ---
 async def setup(bot: commands.Bot):
