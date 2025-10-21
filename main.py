@@ -5,17 +5,21 @@ from discord.ext import commands
 from discord import Intents
 from config import load_config
 from logging_setup import setup_logging
-import data  # импортируем модуль с ленивым кэшем
+import data  # ленивый кэш
+import traceback
 
 logger = logging.getLogger("main")
 
+
 def create_bot() -> commands.Bot:
+    """Создаёт экземпляр бота с нужными интентами."""
     intents = Intents.default()
     intents.members = True
     intents.message_content = True
     return commands.Bot(command_prefix='/', intents=intents)
 
 async def load_cogs(bot: commands.Bot):
+    """Асинхронная загрузка всех когов, включая музыкальный модуль."""
     cogs = [
         "cogs.events",
         "cogs.general",
@@ -36,25 +40,25 @@ async def load_cogs(bot: commands.Bot):
     errors = []
     for cog in cogs:
         if cog in bot.extensions:
-            logger.debug(f"Ког {cog} уже загружен, пропускаем")
+            logger.debug(f"🔁 Ког {cog} уже загружен, пропускаем.")
             continue
         try:
             await bot.load_extension(cog)
-        except Exception as e:
-            import traceback
+        except Exception:
             errors.append((cog, traceback.format_exc()))
 
     if errors:
         failed_cogs = ", ".join([c for c, _ in errors])
         logger.critical(f"❌ Ошибки при загрузке модулей: {failed_cogs}")
         for cog, error in errors:
-            logger.debug(f"Причина сбоя `{cog}`: {error}")
+            logger.error(f"\n--- Ошибка в `{cog}` ---\n{error}\n--- Конец ошибки ---")
     else:
-        logger.success("🎉 Все модули успешно загружены!")
+        logger.success("🎉 Все файлы cogs успешно загружены!")
 
 async def main():
-    config = load_config()          # 1. Загружаем конфиг
-    setup_logging(config)           # 2. Настраиваем логирование с GitHub-бэкапом
+    """Главная точка входа."""
+    config = load_config()
+    setup_logging(config)
 
     token = config.get("DISCORD_TOKEN")
     if not token:
@@ -68,7 +72,9 @@ async def main():
         for guild in bot.guilds:
             logger.info(f"🛡 Сервер: {guild.name} | ID: {guild.id} | Участников: {guild.member_count}")
 
+    # Загружаем коги (включая музыкальный)
     await load_cogs(bot)
+
     try:
         await bot.start(token)
     except discord.LoginFailure:
