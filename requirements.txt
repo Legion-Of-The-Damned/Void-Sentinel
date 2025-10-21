@@ -3,3 +3,5 @@ PyNaCl
 PyGithub
 python-dotenv
 supabase
+yt_dlp
+ffmpeg
