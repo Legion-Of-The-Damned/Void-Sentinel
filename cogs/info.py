@@ -1,46 +1,61 @@
-# cogs/info.py
 import discord
 from discord import app_commands
 from discord.ext import commands
-import requests
-import json
-from base64 import b64decode
-from config import load_config
 import logging
+import json
+from supabase import create_client, Client
+from config import load_config
 
 # --- Логгер для InfoCog ---
-logger = logging.getLogger("InfoCog")
+logger = logging.getLogger("Info")
 
 CONFIG = load_config()
 
-GITHUB_API_URL = f"https://api.github.com/repos/{CONFIG['REPO_NAME']}/contents/server_info.json"
-HEADERS = {"Authorization": f"token {CONFIG['GITHUB_TOKEN']}"}
+# --- Подключение к Supabase через конфиг ---
+supabase: Client = create_client(CONFIG["SUPABASE_URL"], CONFIG["SUPABASE_KEY"])
 
 
 class Info(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    def load_categories_from_github(self):
-        """Загружаем JSON с категориями и их содержимым из GitHub."""
+    def load_categories_from_db(self):
+        """Загружаем категории и их содержимое из таблицы Supabase 'server_info'"""
         try:
-            response = requests.get(GITHUB_API_URL, headers=HEADERS)
-            if response.status_code != 200:
-                logger.error(f"Ошибка загрузки данных с GitHub: статус {response.status_code}")
+            response = supabase.table("server_info").select("*").execute()
+
+            if not response.data:
+                logger.error("Данные из Supabase пустые или не найдены")
                 return {}
-            data = response.json()
-            content = b64decode(data['content']).decode('utf-8')
-            logger.success("Данные с GitHub успешно загружены")
-            return json.loads(content)
+
+            categories = {}
+            for row in response.data:
+                # Если content хранится как JSON-строка
+                if isinstance(row['content'], str):
+                    try:
+                        row['content'] = json.loads(row['content'])
+                    except json.JSONDecodeError:
+                        logger.warning(f"Невалидный JSON в категории '{row['category']}', используем как строку")
+                        row['content'] = [row['content']]  # оборачиваем в список
+                categories[row['category']] = row['content']
+
+            logger.info("Данные с Supabase успешно загружены")
+            return categories
+
         except Exception as e:
-            logger.error(f"❌ Исключение при загрузке данных с GitHub: {e}")
+            logger.error(f"❌ Исключение при загрузке данных из Supabase: {e}")
             return {}
 
-    @app_commands.command(name="информация_о_сервере", description="Показывает информацию о сервере с выбором категории")
+    @app_commands.command(
+        name="информация_о_сервере",
+        description="Показывает информацию о сервере с выбором категории"
+    )
     async def server_info(self, interaction: discord.Interaction):
-        categories = self.load_categories_from_github()
+        categories = self.load_categories_from_db()
         if not categories:
-            await interaction.response.send_message("Ошибка загрузки данных с GitHub!", ephemeral=True)
+            await interaction.response.send_message(
+                "Ошибка загрузки данных из базы!", ephemeral=True
+            )
             return
 
         options = [
@@ -50,7 +65,9 @@ class Info(commands.Cog):
 
         async def select_callback(select_interaction: discord.Interaction):
             if select_interaction.user != interaction.user:
-                await select_interaction.response.send_message("Это меню не для тебя!", ephemeral=True)
+                await select_interaction.response.send_message(
+                    "Это меню не для тебя!", ephemeral=True
+                )
                 logger.warning(f"{select_interaction.user} попытался использовать чужое меню InfoCog")
                 return
 
@@ -70,7 +87,9 @@ class Info(commands.Cog):
         view = discord.ui.View()
         view.add_item(select)
 
-        await interaction.response.send_message("Выберите категорию информации о сервере:", view=view)
+        await interaction.response.send_message(
+            "Выберите категорию информации о сервере:", view=view
+        )
         logger.info(f"{interaction.user} открыл меню информации о сервере")
 
 
