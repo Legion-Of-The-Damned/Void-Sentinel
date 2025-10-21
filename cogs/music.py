@@ -2,143 +2,202 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import asyncio
-import wavelink
+import yt_dlp
+import os
+
+FFMPEG_OPTIONS = {
+    'options': '-vn'
+}
+
+YTDL_OPTIONS = {
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'quiet': True,
+    'extract_flat': False,
+    'default_search': 'ytsearch',
+    'cookiefile': 'cogs/cookies.txt',  # Твой файл cookies
+}
 
 class ControlView(discord.ui.View):
-    def __init__(self, music_cog, interaction):
+    def __init__(self, music_cog, user_id):
         super().__init__(timeout=None)
         self.music_cog = music_cog
-        self.interaction = interaction
+        self.user_id = user_id
 
     @discord.ui.button(emoji="⏸️", style=discord.ButtonStyle.gray)
-    async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        player: wavelink.Player = interaction.guild.voice_client
-        if player.is_playing():
-            await player.pause()
-            await interaction.response.send_message("⏸️ Пауза.", ephemeral=True)
-        elif player.is_paused():
-            await player.resume()
-            await interaction.response.send_message("▶️ Продолжение.", ephemeral=True)
+    async def pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
+        queue_data = self.music_cog.user_queues.get(self.user_id)
+        if queue_data and queue_data['vc']:
+            vc = queue_data['vc']
+            if vc.is_playing():
+                vc.pause()
+                await interaction.response.send_message("⏸ Музыка на паузе.", ephemeral=True)
+            elif vc.is_paused():
+                vc.resume()
+                await interaction.response.send_message("▶️ Музыка продолжена.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ Музыка не воспроизводится.", ephemeral=True)
         else:
-            await interaction.response.send_message("❗ Музыка не воспроизводится.", ephemeral=True)
+            await interaction.response.send_message("❌ Музыка не воспроизводится.", ephemeral=True)
 
     @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.gray)
-    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.music_cog.skip_song(interaction)
+    async def skip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        queue_data = self.music_cog.user_queues.get(self.user_id)
+        if queue_data and queue_data['vc'] and queue_data['vc'].is_playing():
+            queue_data['vc'].stop()
+            await interaction.response.send_message("⏭ Трек пропущен.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Музыка не воспроизводится.", ephemeral=True)
 
     @discord.ui.button(emoji="⏹️", style=discord.ButtonStyle.gray)
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.music_cog.stop_song(interaction)
+    async def stop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        queue_data = self.music_cog.user_queues.get(self.user_id)
+        if queue_data:
+            queue_data['queue'].clear()
+            if queue_data['vc']:
+                await queue_data['vc'].disconnect()
+            self.music_cog.user_queues.pop(self.user_id, None)
+            await interaction.response.send_message("⏹ Музыка остановлена и очередь очищена.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Музыка не воспроизводится.", ephemeral=True)
 
     @discord.ui.button(emoji="🔁", style=discord.ButtonStyle.gray)
-    async def repeat_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.music_cog.repeat = not self.music_cog.repeat
-        status = "включен" if self.music_cog.repeat else "выключен"
-        await interaction.response.send_message(f"🔁 Повтор {status}.", ephemeral=True)
+    async def repeat(self, interaction: discord.Interaction, button: discord.ui.Button):
+        queue_data = self.music_cog.user_queues.get(self.user_id)
+        if queue_data:
+            queue_data['repeat'] = not queue_data['repeat']
+            status = "включен" if queue_data['repeat'] else "выключен"
+            await interaction.response.send_message(f"🔁 Повтор {status}.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Музыка не воспроизводится.", ephemeral=True)
 
 
 class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.queue = asyncio.Queue()
-        self.current = None
-        self.play_next_song = asyncio.Event()
-        self.repeat = False
-        self.node = None
-        asyncio.create_task(self.player_loop())
-        asyncio.create_task(self.connect_node())
-
-    async def connect_node(self):
-        # создаём Node без аргумента bot
-        self.node = wavelink.Node(
-            host='127.0.0.1',
-            port=2333,
-            password='youshallnotpass'
-        )
-        await self.node.wait_until_ready()
+        self.user_queues = {}  # ключ: user_id, значение: {queue, vc, repeat, current}
 
     async def ensure_voice(self, interaction: discord.Interaction):
-        vc: wavelink.Player = interaction.guild.voice_client
-        if vc is None:
-            if interaction.user.voice:
-                vc = await interaction.user.voice.channel.connect(cls=wavelink.Player)
-                vc.node = self.node  # привязываем Node
+        if interaction.user.voice and interaction.user.voice.channel:
+            return interaction.user.voice.channel
+        else:
+            await interaction.response.send_message("❌ Вы не находитесь в голосовом канале.", ephemeral=True)
+            return None
+
+    async def player_loop(self, user_id):
+        queue_data = self.user_queues[user_id]
+        while queue_data['queue']:
+            current = queue_data['queue'][0]
+            vc = queue_data['vc']
+
+            def after_play(error):
+                fut = self.bot.loop.create_task(self.after_song(user_id))
+                try:
+                    fut.result()
+                except:
+                    pass
+
+            vc.play(current['source'], after=after_play)
+
+            # Embed с текущим и 5 следующими треками
+            embed = discord.Embed(title=f"🎶 Сейчас играет: {current['title']}", color=discord.Color.blue())
+            next_tracks = queue_data['queue'][1:6]
+            if next_tracks:
+                embed.add_field(name="Следующие треки:", value="\n".join([t['title'] for t in next_tracks]), inline=False)
+
+            # Отправляем или редактируем сообщение, чтобы видеть обновленную очередь
+            if queue_data.get('msg') is None:
+                msg = await current['interaction'].followup.send(embed=embed, view=ControlView(self, user_id))
+                queue_data['msg'] = msg
             else:
-                await interaction.response.send_message(
-                    "❗ Вы не находитесь в голосовом канале.", ephemeral=True
-                )
-                return None
-        return vc
+                try:
+                    await queue_data['msg'].edit(embed=embed, view=ControlView(self, user_id))
+                except:
+                    # Если сообщение удалено, отправляем новое
+                    msg = await current['interaction'].followup.send(embed=embed, view=ControlView(self, user_id))
+                    queue_data['msg'] = msg
 
-    async def player_loop(self):
-        await self.bot.wait_until_ready()
-        while True:
-            self.play_next_song.clear()
-            self.current = await self.queue.get()
-            player: wavelink.Player = self.current['player']
-            track: wavelink.Track = self.current['track']
+            await asyncio.sleep(1)
+            while vc.is_playing() or vc.is_paused():
+                await asyncio.sleep(1)
+            if not queue_data['repeat']:
+                queue_data['queue'].pop(0)
 
-            await player.play(track)
-            await self.current["interaction"].followup.send(
-                embed=discord.Embed(
-                    title=f"🎶 Сейчас играет: {track.title}",
-                    url=track.uri,
-                    color=discord.Color.blue()
-                ),
-                view=ControlView(self, self.current["interaction"])
-            )
+        # Очередь пустая — отключаемся
+        if vc.is_connected():
+            await vc.disconnect()
+        self.user_queues.pop(user_id, None)
 
-            await self.play_next_song.wait()
-            if self.repeat:
-                await self.queue.put(self.current)
+    async def after_song(self, user_id):
+        queue_data = self.user_queues.get(user_id)
+        if queue_data and queue_data['queue']:
+            if queue_data['repeat']:
+                # Если повтор включен, не убираем первый трек
+                return
+            queue_data['queue'].pop(0)
+            # Обновляем embed с очередью после каждого трека
+            if queue_data['queue'] and queue_data.get('msg'):
+                next_tracks = queue_data['queue'][:5]
+                embed = discord.Embed(title=f"🎶 Сейчас играет: {queue_data['queue'][0]['title']}", color=discord.Color.blue())
+                if next_tracks[1:]:
+                    embed.add_field(name="Следующие треки:", value="\n".join([t['title'] for t in next_tracks[1:]]), inline=False)
+                try:
+                    await queue_data['msg'].edit(embed=embed, view=ControlView(self, user_id))
+                except:
+                    pass
 
-    @app_commands.command(name="играть", description="Играет песню по ссылке или поиску")
-    @app_commands.describe(запрос="Ссылка или поисковый запрос для песни")
+    @app_commands.command(name="играть", description="Играет песню по названию или ссылке")
+    @app_commands.describe(запрос="Название песни или ссылка")
     async def play(self, interaction: discord.Interaction, запрос: str):
-        player = await self.ensure_voice(interaction)
-        if player is None:
+        channel = await self.ensure_voice(interaction)
+        if not channel:
             return
 
         await interaction.response.defer()
 
-        if запрос.startswith("http"):
-            track = await wavelink.YouTubeTrack.from_url(запрос)
-        else:
-            track = await wavelink.YouTubeTrack.search(запрос, return_first=True)
-
-        if track is None:
-            await interaction.followup.send("❌ Трек не найден.", ephemeral=True)
+        if not os.path.isfile(YTDL_OPTIONS['cookiefile']):
+            await interaction.followup.send("❌ Файл cookies не найден!", ephemeral=True)
             return
 
-        await self.queue.put({"track": track, "player": player, "interaction": interaction})
-        if not player.is_playing():
-            self.play_next_song.set()
-            await interaction.followup.send(f"▶️ Начинаю воспроизведение: **{track.title}**", ephemeral=True)
-        else:
-            await interaction.followup.send(f"✅ Трек **{track.title}** добавлен в очередь.", ephemeral=True)
+        user_id = interaction.user.id
+        queue_data = self.user_queues.get(user_id)
 
-    async def skip_song(self, interaction: discord.Interaction):
-        player: wavelink.Player = interaction.guild.voice_client
-        if player and player.is_playing():
-            await player.stop()
-            await interaction.response.send_message("⏭️ Текущий трек пропущен.", ephemeral=True)
+        if not queue_data:
+            vc = await channel.connect()
+            self.user_queues[user_id] = {
+                'queue': [],
+                'vc': vc,
+                'repeat': False,
+                'current': None,
+                'msg': None
+            }
+            queue_data = self.user_queues[user_id]
         else:
-            await interaction.response.send_message("❗ Музыка не воспроизводится.", ephemeral=True)
+            vc = queue_data['vc']
+            if not vc.is_connected():
+                vc = await channel.connect()
+                queue_data['vc'] = vc
 
-    async def stop_song(self, interaction: discord.Interaction):
-        player: wavelink.Player = interaction.guild.voice_client
-        if player:
-            while not self.queue.empty():
-                try:
-                    self.queue.get_nowait()
-                    self.queue.task_done()
-                except asyncio.QueueEmpty:
-                    break
-            await player.stop()
-            await player.disconnect()
-            await interaction.response.send_message("⏹️ Воспроизведение остановлено и очередь очищена.", ephemeral=True)
+        # Загружаем трек
+        try:
+            with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
+                info = ydl.extract_info(запрос, download=False)
+                if 'entries' in info:
+                    info = info['entries'][0]
+                url = info['url']
+                title = info.get('title', 'Неизвестная песня')
+        except Exception as e:
+            await interaction.followup.send(f"❌ Ошибка загрузки трека: {e}", ephemeral=True)
+            return
+
+        source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
+        queue_data['queue'].append({'source': source, 'title': title, 'interaction': interaction})
+
+        if len(queue_data['queue']) == 1:
+            # Запускаем player loop
+            asyncio.create_task(self.player_loop(user_id))
         else:
-            await interaction.response.send_message("❗ Бот не подключён.", ephemeral=True)
+            await interaction.followup.send(f"✅ Трек **{title}** добавлен в очередь.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
