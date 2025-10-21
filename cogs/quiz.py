@@ -10,7 +10,7 @@ from config import load_config
 from supabase import create_client, Client
 
 CONFIG = load_config()
-logger = logging.getLogger("QuizCog")
+logger = logging.getLogger("Quiz")
 
 # Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")

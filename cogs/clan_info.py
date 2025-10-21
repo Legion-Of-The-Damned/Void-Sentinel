@@ -5,7 +5,7 @@ from discord import app_commands
 from config import load_config
 
 # --- Настройка логгера ---
-logger = logging.getLogger("ClanInfoCog")
+logger = logging.getLogger("ClanInfo")
 
 
 class ClanInfo(commands.Cog):

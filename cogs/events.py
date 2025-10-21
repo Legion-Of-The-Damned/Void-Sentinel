@@ -3,7 +3,7 @@ import logging
 from discord.ext import commands
 
 # --- Настройка логгера для этого кога ---
-logger = logging.getLogger("EventsCog")
+logger = logging.getLogger("Events")
 
 class Events(commands.Cog):
     def __init__(self, bot, avatar_url, image_url):
