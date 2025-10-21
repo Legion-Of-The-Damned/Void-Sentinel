@@ -6,6 +6,8 @@ import platform
 import psutil
 import asyncio
 from datetime import datetime, timedelta
+import json
+import os
 
 # --- Настройка логгера ---
 logging.basicConfig(
@@ -14,15 +16,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger("discord")
 
-BOT_VERSION = "3.0"  # обновленная версия с напоминаниями
+BOT_VERSION = "3.1"  # обновленная версия с напоминаниями
+
+# Путь к файлу с напоминаниями
+DATA_DIR = "data"
+REMINDERS_FILE = os.path.join(DATA_DIR, "reminders.json")
 
 # Словарь для хранения напоминаний в формате {user_id: [(time, message), ...]}
 user_reminders = {}
+
+# --- Вспомогательные функции для сохранения/загрузки ---
+def save_reminders():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(REMINDERS_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            str(user_id): [(dt.isoformat(), msg) for dt, msg in reminders]
+            for user_id, reminders in user_reminders.items()
+        }, f, ensure_ascii=False, indent=4)
+
+def load_reminders():
+    global user_reminders
+    try:
+        with open(REMINDERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            user_reminders = {
+                int(user_id): [(datetime.fromisoformat(dt), msg) for dt, msg in reminders]
+                for user_id, reminders in data.items()
+            }
+    except FileNotFoundError:
+        user_reminders = {}
 
 class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.synced = False
+        load_reminders()  # загружаем напоминания при старте
         self.check_reminders.start()  # запуск фоновой проверки напоминаний
 
     # --- Событие готовности ---
@@ -45,43 +73,38 @@ class GeneralCommands(commands.Cog):
     # --- Команда помощи ---
     @app_commands.command(name="помощь", description="Показывает список доступных команд")
     async def help_command(self, interaction):
-        wins = getattr(self.bot, 'total_duel_wins', "N/A")
-        losses = getattr(self.bot, 'total_duel_losses', "N/A")
-
         embed = discord.Embed(
             title="⚔ Void Sentinel | Руководство по командам ⚔",
             description=(
-                "Приветствую, воин! Я — Void Sentinel, страж клана Legion Of The Damned.\n\n"
                 ":fire: **Основные функции:**\n"
                 ":one: Приветствие новичков\n"
                 ":two: Уведомление об уходе\n"
                 ":three: `/помощь` — показать команды\n"
                 ":four: `/состав_клана` — показать участников\n"
-                ":five: `/информация_о_сервере` — посмотреть информацию о сервере с выбором категории\n"
-                ":six: `/пинг` — проверить статус бота и его ресурсы\n"
-                ":seven: `/заявка` — заполнить анкету для вступления в клан\n\n"
+                ":five: `/информация_о_сервере`\n"
+                ":six: `/пинг` — проверить статус бота\n"
+                ":seven: `/заявка`\n\n"
                 "⚔ **Боевые команды:**\n"
-                ":eight: `/дуэль` — вызвать бой\n"
-                ":nine: `/статистика` — посмотреть рейтинг\n"
-                ":one: :zero: `/общая_статистика` — общая статистика дуэлей\n\n"
+                ":eight: `/дуэль`\n"
+                ":nine: `/статистика`\n"
+                ":keycap_ten: `/общая_статистика`\n\n"
                 ":game_die: **Игровые мини-игры:**\n"
-                ":one: :one: `/викторина` — пройти викторину\n"
-                ":one: :two: `/монетка` — подбросить монетку (орёл/решка)\n"
-                ":one: :three: `/камень_ножницы_бумага` — сыграть в игру КНБ\n\n"
+                ":one::one: `/викторина`\n"
+                ":one::two: `/монетка`\n"
+                ":one::three: `/камень_ножницы_бумага`\n\n"
                 ":memo: **Личные заметки:**\n"
-                ":one: :four: `/напомни [время в минутах] [текст]` — создать напоминание\n\n"
+                ":one::four: `/напомни [минуты] [текст]`\n\n"
                 ":rotating_light: **Административные команды:**\n"
-                ":one: :five: `/победа` — зафиксировать победу\n"
-                ":one: :six: `/изгнание` — изгнать из клана и назначить роль 'Друг клана'\n"
-                ":one: :seven: `/бан @участник` — забанить участника\n"
-                ":one: :eight: `/разбан [ID пользователя]` — разбанить участника\n"
-                ":one: :nine: `/кик @участник` — кикнуть участника\n"
-                ":one: :zero: `/мут @участник [минуты]` — выдать мут\n"
-                ":two: :one: `/размут @участник` — снять мут\n"
+                ":one::five: `/победа`\n"
+                ":one::six: `/изгнание`\n"
+                ":one::seven: `/бан @участник`\n"
+                ":one::eight: `/разбан [ID]`\n"
+                ":one::nine: `/кик @участник`\n"
+                ":two::zero: `/мут @участник [минуты]`\n"
+                ":two::one: `/размут @участник`\n"
             ),
             color=discord.Color.red()
         )
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1355929392072753262/1355975277930348675/ChatGPT_Image_30_._2025_._21_11_52.png")
         await interaction.response.send_message(embed=embed)
         logger.info(f"📖 /помощь | Пользователь: {interaction.user} | Сервер: {interaction.guild.name if interaction.guild else 'ЛС'}")
 
@@ -120,6 +143,7 @@ class GeneralCommands(commands.Cog):
         remind_time = datetime.utcnow() + timedelta(minutes=minutes)
         user_id = interaction.user.id
         user_reminders.setdefault(user_id, []).append((remind_time, message))
+        save_reminders()  # сохраняем в JSON
         await interaction.response.send_message(
             f"⏰ Напоминание установлено через {minutes} минут: {message}", ephemeral=True
         )
@@ -139,8 +163,10 @@ class GeneralCommands(commands.Cog):
                         except Exception as e:
                             logger.warning(f"Не удалось отправить напоминание пользователю {user_id}: {e}")
                     reminders.remove((remind_time, message))
+                    save_reminders()  # сохраняем изменения
             if not reminders:
                 user_reminders.pop(user_id, None)
+                save_reminders()
 
     @check_reminders.before_loop
     async def before_check_reminders(self):
