@@ -32,14 +32,18 @@ class ColorFormatter(logging.Formatter):
 class CustomDiscordFormatter(logging.Formatter):
     def format(self, record):
         msg = record.getMessage()
+
         if "logging in using static token" in msg:
             record.msg = "🔑 Авторизация через токен выполнена"
             record.args = ()
         elif "has connected to Gateway" in msg:
             record.msg = "🌐 Шард успешно подключён к Gateway"
             record.args = ()
-        return super().format(record)
+        elif "RESUMED session" in msg:
+            record.msg = "🌟 Соединение восстановлено успешно!"
+            record.args = ()
 
+        return super().format(record)
 
 # -------------------------
 # 🔹 Кастомный уровень LOG_PUSH
