@@ -7,6 +7,9 @@ from config import load_config
 from logging_setup import setup_logging
 import data  # ленивый кэш
 import traceback
+import os, sys
+
+os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
 logger = logging.getLogger("main")
 
@@ -21,21 +24,19 @@ def create_bot() -> commands.Bot:
 async def load_cogs(bot: commands.Bot):
     """Асинхронная загрузка всех когов, включая музыкальный модуль."""
     cogs = [
+        "cogs.admin",
+        "cogs.applications",
+        "cogs.clan_general",
+        "cogs.clan_info",
+        "cogs.coinflip",
+        "cogs.duel",
         "cogs.events",
         "cogs.general",
-        "cogs.duel",
-        "cogs.quiz",
-        "cogs.music",
-        "cogs.voting",
-        "cogs.coinflip",
-        "cogs.role_reactions",
-        "cogs.applications",
-        "cogs.verification",
-        "cogs.clan_info",
         "cogs.info",
-        "cogs.rps_cog",
-        "cogs.admin",
-        "cogs.clan_general",
+        "cogs.music",
+        "cogs.quiz",
+        "cogs.rps",
+        "cogs.voting"
     ]
 
     errors = []
