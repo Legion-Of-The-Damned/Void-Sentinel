@@ -2,6 +2,11 @@ import discord
 import logging
 from discord.ext import commands
 from discord import app_commands
+from config import load_config
+
+# --- Настройка логгера ---
+logger = logging.getLogger("ClanInfo")
+
 
 class ClanInfo(commands.Cog):
     def __init__(self, bot: commands.Bot, clan_role_names: list[str]):
@@ -12,8 +17,9 @@ class ClanInfo(commands.Cog):
     async def on_ready(self):
         try:
             await self.bot.tree.sync()
+            logger.success("Команды успешно синхронизированы")
         except Exception as e:
-            logging.error(f"❌ Ошибка при синхронизации команд: {e}")
+            logger.error(f"Ошибка при синхронизации команд: {e}")
 
     @app_commands.command(name="состав_клана", description="Отправить информацию о составе клана.")
     async def clan_info(self, interaction: discord.Interaction):
@@ -28,6 +34,7 @@ class ClanInfo(commands.Cog):
                 "❌ У меня нет прав на создание вебхуков в этом канале.",
                 ephemeral=True
             )
+            logger.warning(f"Нет прав на создание вебхуков в канале {channel.name} ({guild.name})")
             return
 
         try:
@@ -68,13 +75,13 @@ class ClanInfo(commands.Cog):
             await webhook.delete()
 
             await interaction.response.send_message("✅ Информация о клане отправлена через вебхук.", ephemeral=True)
-
+            logger.success(f"{interaction.user} отправил информацию о составе клана через вебхук")
         except Exception as e:
-            logging.error(f"❌ Ошибка при отправке информации о клане: {e}")
+            logger.error(f"Ошибка при отправке информации о клане: {e}")
             await interaction.response.send_message("❌ Не удалось отправить информацию о клане.", ephemeral=True)
 
 
+# --- Setup ---
 async def setup(bot: commands.Bot):
-    from config import load_config
     config = load_config()
     await bot.add_cog(ClanInfo(bot, config["CLAN_ROLE_NAMES"]))

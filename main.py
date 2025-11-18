@@ -5,51 +5,62 @@ from discord.ext import commands
 from discord import Intents
 from config import load_config
 from logging_setup import setup_logging
+import data  # ленивый кэш
+import traceback
+import os, sys
+
+os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
+
+logger = logging.getLogger("main")
 
 
 def create_bot() -> commands.Bot:
+    """Создаёт экземпляр бота с нужными интентами."""
     intents = Intents.default()
     intents.members = True
     intents.message_content = True
     return commands.Bot(command_prefix='/', intents=intents)
 
-
 async def load_cogs(bot: commands.Bot):
+    """Асинхронная загрузка всех когов, включая музыкальный модуль."""
     cogs = [
+        "cogs.admin",
+        "cogs.applications",
+        "cogs.clan_general",
+        "cogs.clan_info",
+        "cogs.coinflip",
+        "cogs.duel",
         "cogs.events",
         "cogs.general",
-        "cogs.duel",
-        "cogs.quiz",
-        "cogs.voting",
-        "cogs.coinflip",
-        "cogs.music_cog",
         "cogs.info",
-        "cogs.verification",
-        "cogs.clan_info",
-        "cogs.rps_cog",
-        "cogs.admin",
-        "cogs.clan_general",  # убедись, что загружаешь только один раз
+        "cogs.music",
+        "cogs.quiz",
+        "cogs.rps",
+        "cogs.voting"
     ]
 
     errors = []
     for cog in cogs:
         if cog in bot.extensions:
-            logging.info(f"Ког {cog} уже загружен, пропускаем")
+            logger.debug(f"🔁 Ког {cog} уже загружен, пропускаем.")
             continue
         try:
             await bot.load_extension(cog)
-        except Exception as e:
-            errors.append((cog, str(e)))
+        except Exception:
+            errors.append((cog, traceback.format_exc()))
 
     if errors:
+        failed_cogs = ", ".join([c for c, _ in errors])
+        logger.critical(f"❌ Ошибки при загрузке модулей: {failed_cogs}")
         for cog, error in errors:
-            logging.error(f"⚠️ Ошибка при загрузке модуля `{cog}`: {error}")
+            logger.error(f"\n--- Ошибка в `{cog}` ---\n{error}\n--- Конец ошибки ---")
     else:
-        logging.info("✅ Все модули успешно загружены.")
+        logger.success("🎉 Все файлы cogs успешно загружены!")
 
 async def main():
-    setup_logging()
+    """Главная точка входа."""
     config = load_config()
+    setup_logging(config)
 
     token = config.get("DISCORD_TOKEN")
     if not token:
@@ -59,23 +70,25 @@ async def main():
 
     @bot.event
     async def on_ready():
-        logging.info(f"✅ Бот `{bot.user}` успешно запущен (ID: {bot.user.id})")
+        logger.success(f"🤖 Бот `{bot.user}` успешно запущен (ID: {bot.user.id})")
         for guild in bot.guilds:
-            logging.info(f"🛡 Сервер: {guild.name} | ID: {guild.id} | Участников: {guild.member_count}")
+            logger.info(f"🛡 Сервер: {guild.name} | ID: {guild.id} | Участников: {guild.member_count}")
 
+    # Загружаем коги (включая музыкальный)
     await load_cogs(bot)
+
     try:
         await bot.start(token)
     except discord.LoginFailure:
-        logging.critical("❌ Неверный Discord токен.")
+        logger.critical("❌ Неверный Discord токен.")
     except Exception as e:
-        logging.critical(f"🔥 Критическая ошибка при запуске: {e}")
+        logger.critical(f"🔥 Критическая ошибка при запуске: {e}")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("🛑 Запуск остановлен вручную.")
+        logger.warning("🛑 Запуск остановлен вручную.")
     except Exception as e:
-        logging.critical(f"🚨 Неожиданная ошибка: {e}")
+        logger.critical(f"🚨 Неожиданная ошибка: {e}")
