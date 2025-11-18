@@ -3,11 +3,10 @@ import logging
 from discord.ext import commands
 import random
 
-# --- Используем root logger, настроенный через setup_logging ---
-logger = logging.getLogger()  # уже настроен через твой логгер файл
+logger = logging.getLogger()  # Используем настроенный root logger
 
 class CoinFlipButton(discord.ui.View):
-    def __init__(self, challenger: discord.Member, opponent: discord.Member, bot, play_vs_bot=False, timeout=60):
+    def __init__(self, challenger: discord.User, opponent: discord.User, bot, play_vs_bot=False, timeout=60):
         super().__init__(timeout=timeout)
         self.challenger = challenger
         self.opponent = opponent
@@ -71,13 +70,13 @@ class CoinFlipButton(discord.ui.View):
         if winner:
             if winner == self.challenger.id:
                 description += f"🎉 Побеждает {self.challenger.mention}!"
-                logger.success(f"{self.challenger} победил в игре Монетка ({result})")
+                logger.info(f"{self.challenger} победил в игре Монетка ({result})")
             elif winner == self.opponent.id:
                 description += f"🎉 Побеждает {self.opponent.mention}!"
-                logger.success(f"{self.opponent} победил в игре Монетка ({result})")
+                logger.info(f"{self.opponent} победил в игре Монетка ({result})")
             else:
                 description += f"🤖 Побеждает {self.bot.user.mention}!"
-                logger.success(f"{self.bot.user} победил в игре Монетка ({result})")
+                logger.info(f"{self.bot.user} победил в игре Монетка ({result})")
         else:
             description += "⚖️ Ничья! У обоих одинаковый выбор."
             logger.info(f"Ничья в игре Монетка: результат {result}")
@@ -90,21 +89,30 @@ class CoinFlipButton(discord.ui.View):
         except Exception as e:
             logger.error(f"Ошибка при отправке результата броска: {e}")
 
+
 class CoinFlip(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.hybrid_command(name="монетка", description="Вызвать игрока или бота на Орёл или Решка!")
-    async def coinflip(self, ctx: commands.Context, opponent: discord.Member = None):
+    async def coinflip(self, ctx: commands.Context, opponent: discord.User = None):
         opponent = opponent or self.bot.user
 
-        if opponent.id == ctx.author.id:
+        # Если команда вызвана на сервере — пытаемся получить Member
+        if ctx.guild:
+            opponent_member = ctx.guild.get_member(opponent.id)
+        else:
+            opponent_member = None
+
+        participant = opponent_member or opponent
+
+        if participant.id == ctx.author.id:
             await ctx.send("❌ Нельзя играть с самим собой.")
             logger.warning(f"{ctx.author} попытался сыграть с самим собой")
             return
 
-        play_vs_bot = opponent.bot
-        view = CoinFlipButton(ctx.author, opponent, self.bot, play_vs_bot=play_vs_bot)
+        play_vs_bot = participant.bot
+        view = CoinFlipButton(ctx.author, participant, self.bot, play_vs_bot=play_vs_bot)
 
         title = "🪙 Монетка: Орёл или Решка!"
         if play_vs_bot:
@@ -114,7 +122,7 @@ class CoinFlip(commands.Cog):
             )
         else:
             description = (
-                f"{ctx.author.mention} вызвал {opponent.mention} на бросок монеты!\n\n"
+                f"{ctx.author.mention} вызвал {participant.mention} на бросок монеты!\n\n"
                 f"Оба игрока должны выбрать сторону.\n"
                 f"Побеждает тот, чья сторона выпадет!"
             )
@@ -122,7 +130,8 @@ class CoinFlip(commands.Cog):
         embed = discord.Embed(title=title, description=description, color=0x00BFFF)
         msg = await ctx.send(embed=embed, view=view)
         view.result_msg = msg
-        logger.info(f"Игра создана: {ctx.author} vs {opponent}, сообщение {msg.id}")
+        logger.info(f"Игра создана: {ctx.author} vs {participant}, сообщение {msg.id}")
+
 
 async def setup(bot):
     await bot.add_cog(CoinFlip(bot))
