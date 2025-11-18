@@ -100,6 +100,29 @@ class Events(commands.Cog):
         else:
             logger.error(f"❌ Нет доступного канала на сервере {guild.name} для сообщения об уходе")
 
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        """Отслеживает получение клановой роли и пишет игроку в ЛС"""
+        clan_role_id = 1418038359129063585  # 🔹 замени на ID роли клана
+        clan_role = after.guild.get_role(clan_role_id)
+        if not clan_role:
+            logger.warning(f"Роль с ID {clan_role_id} не найдена на сервере {after.guild.name}")
+            return
+
+        # Проверяем: раньше роли не было, теперь появилась
+        if clan_role not in before.roles and clan_role in after.roles:
+            try:
+                await after.send(
+                    f"Привет, {after.display_name}! ✅ "
+                    f"Вы успешно верифицированы на сервере.\n\n"
+                    f"Если вы хотите полноценно вступить в клан, введите команду `/заявка`."
+                )
+                logger.info(f"💬 Отправлено ЛС пользователю {after.display_name} о вступлении в клан.")
+            except discord.Forbidden:
+                logger.debug(f"Не удалось отправить ЛС пользователю {after.display_name} — личка закрыта.")
+            except Exception as e:
+                logger.error(f"Ошибка при отправке ЛС пользователю {after.display_name}: {e}")
+
 async def setup(bot):
     from config import load_config
     config = load_config()
