@@ -6,7 +6,7 @@ from supabase import create_client, Client
 import logging
 
 # Подключаем твой стильный логгер
-logger = logging.getLogger("StylishLogger")  # Используем уже настроенный логгер
+logger = logging.getLogger("Applications")  # Используем уже настроенный логгер
 
 # Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -64,11 +64,11 @@ def push_to_supabase(user_name, answers):
 class Applications(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.APPLICATIONS_CHANNEL_ID = 1362357361863295199
+        self.APPLICATIONS_CHANNEL_ID = 1297692294878859314
         self.MEMBER_ROLE_NAME = "💀Легион Проклятых🔥"
         self.OLD_ROLE_NAME = "🤝Друг клана🚩"
         self.active_applications = set()
-        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "Модератор"]
+        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "Администратор"]
         self.NOTIFY_ROLE_ID = 828749920411713588
 
     async def is_staff(self, interaction: discord.Interaction):

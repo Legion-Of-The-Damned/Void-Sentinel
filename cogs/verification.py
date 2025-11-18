@@ -126,16 +126,6 @@ class Verification(commands.Cog):
                 await member.add_roles(role)
                 logger.success(f"Роль {role.name} выдана пользователю {member}.")
 
-                await asyncio.sleep(3)
-                try:
-                    await member.send(
-                        f"Привет, {member.display_name}! ✅ "
-                        f"Вы успешно верифицированы на сервере.\n\n"
-                        f"Если вы хотите полноценно вступить в клан, введите команду `/заявка`."
-                    )
-                    logger.info(f"Отправлено ЛС пользователю {member}.")
-                except discord.Forbidden:
-                    logger.debug(f"Не удалось отправить ЛС пользователю {member}. Он мог закрыть личку.")
             except discord.Forbidden:
                 logger.warning(f"Нет прав для выдачи роли {role.name} пользователю {member}.")
             except Exception as e:
