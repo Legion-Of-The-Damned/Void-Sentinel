@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("discord")
 
-BOT_VERSION = "3.5"  # обновленная версия с напоминаниями
+BOT_VERSION = "3.5.2"  # обновленная версия с напоминаниями
 
 # Путь к файлу с напоминаниями
 DATA_DIR = "data"

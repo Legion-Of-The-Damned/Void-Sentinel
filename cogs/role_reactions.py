@@ -8,36 +8,48 @@ logger = logging.getLogger("role_reactions")
 class RoleReactionsWebhook(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.role_channel_id = 1273350157257146388  # ID канала для выбора ролей
+        self.role_channel_id = 1460790284261658851  # ID канала для выбора ролей
 
-        # === Роли-секции ===
-        self.section_roles = [
-            "ㅤㅤㅤㅤㅤㅤㅤИгры: ㅤㅤㅤㅤㅤㅤㅤㅤ",
-            "ㅤㅤㅤㅤㅤㅤㅤДругое:ㅤㅤㅤㅤㅤㅤㅤ"
-        ]
+        # === Роль-секция ===
+        self.section_role_name = "ㅤㅤㅤㅤㅤㅤㅤКлассы:ㅤㅤㅤㅤㅤㅤㅤ"
 
-        # === Секции с ролями ===
+        # === Секция с ролями ===
         self.sections = {
-            "🎮 Игры:": {
-                "⚔️": ("ECR", "Warhammer 40,000 Eternal Crusade Resurrection"),
-                "💀": ("DWC", "Warhammer 40,000 Deathwatch Chronicles"),
-                "🎯": ("TF2", "Team Fortress 2"),
-                "🌎": ("WOW", "World Of Warcraft Sirus"),
-                "🏜️": ("Arizona", "Arizona Kingman"),
-                "🧟": ("L4D2", "Left 4 Dead 2"),
-            },
-            "📦 Другое:": {
-                "🤖": ("Техножрец", "Техножрец (Открывает доступ к ктегории по разработке программ и бота)"),
-                "👽": ("Киноман", "Киноман"),
+            "🛡️ Классы:": {
+                # SCX
+                "🟥": ("SCX Ралик", "SCX Ралик"),
+                "🟦": ("SCX Штурма", "SCX Штурма"),
+                "🟩": ("SCX Био-штурма", "SCX Био-штурма"),
+
+                # TF2
+                "🏃": ("TF2 Разведчик", "TF2 Разведчик"),
+                "🎖️": ("TF2 Солдат", "TF2 Солдат"),
+                "🔥": ("TF2 Поджигатель", "TF2 Поджигатель"),
+                "💣": ("TF2 Подрывник", "TF2 Подрывник"),
+                "🔫": ("TF2 Пулемётчик", "TF2 Пулемётчик"),
+                "🔧": ("TF2 Инженер", "TF2 Инженер"),
+                "💉": ("TF2 Медик", "TF2 Медик"),
+                "🎯": ("TF2 Снайпер", "TF2 Снайпер"),
+                "🕵️": ("TF2 Шпион", "TF2 Шпион"),
+
+                # ECR
+                "⚔️": ("ECR Тактик", "ECR Тактик"),
+                "🛡️": ("ECR Авангард", "ECR Авангард"),
+                "🦅": ("ECR Раптор", "ECR Раптор"),
+                "🤖": ("ECR Антитех", "ECR Антитех"),
+                "🧬": ("ECR Апотекарий", "ECR Апотекарий"),
+                "💥": ("ECR Хавок", "ECR Хавок"),
             }
         }
 
-        # Плоский словарь для выдачи ролей по эмодзи
+        # Плоский словарь: эмодзи -> название роли
         self.emoji_roles = {
-            emoji: short for section in self.sections.values() for emoji, (short, _) in section.items()
+            emoji: short
+            for roles in self.sections.values()
+            for emoji, (short, _) in roles.items()
         }
 
-        # Путь к файлу с ID сообщения
+        # Файл с ID сообщения
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         data_folder = os.path.join(base_path, "data")
         os.makedirs(data_folder, exist_ok=True)
@@ -46,42 +58,45 @@ class RoleReactionsWebhook(commands.Cog):
         self.role_message_id = None
         self.load_role_message_id()
 
+    # ---------- Работа с файлом ----------
     def load_role_message_id(self):
-        """Загрузка ID сообщения из файла"""
         if os.path.exists(self.role_message_file):
             try:
                 with open(self.role_message_file, "r") as f:
                     self.role_message_id = int(f.read().strip())
-                    logger.success(f"Загружен ID сообщения для ролей: {self.role_message_id}")
+                logger.info(f"Загружен ID сообщения для ролей: {self.role_message_id}")
             except Exception as e:
                 logger.warning(f"Не удалось загрузить ID сообщения: {e}")
 
     def save_role_message_id(self):
-        """Сохранение ID сообщения в файл"""
         try:
             with open(self.role_message_file, "w") as f:
                 f.write(str(self.role_message_id))
-            logger.success(f"Сохранён ID сообщения: {self.role_message_id}")
+            logger.info(f"Сохранён ID сообщения: {self.role_message_id}")
         except Exception as e:
             logger.error(f"Не удалось сохранить ID сообщения: {e}")
 
-    async def ensure_section_roles(self, guild):
-        """Создаёт недостающие роли-секции"""
-        for role_name in self.section_roles:
-            if not discord.utils.get(guild.roles, name=role_name):
-                await guild.create_role(name=role_name, hoist=False, mentionable=False)
-                logger.info(f"Создана недостающая роль-секция: {role_name}")
+    # ---------- Подготовка ролей ----------
+    async def ensure_section_role(self, guild):
+        if not discord.utils.get(guild.roles, name=self.section_role_name):
+            await guild.create_role(
+                name=self.section_role_name,
+                hoist=False,
+                mentionable=False
+            )
+            logger.info(f"Создана роль-секция: {self.section_role_name}")
 
+    # ---------- Сообщение с ролями ----------
     async def create_role_message(self, channel):
-        """Создание нового сообщения с ролями"""
-        description_lines = ["✠ **Выберите свою роль, чтобы указать во что вы играете и чтобы открыть доступ к каналам** ✠\n"]
+        description_lines = []
+
         for section_title, roles in self.sections.items():
             description_lines.append(f"\n{section_title}")
             for emoji, (short, full) in roles.items():
-                description_lines.append(f"{emoji} — **{short}** 〰️ *{full}*")
+                description_lines.append(f"{emoji} — **{short}**")
 
         embed = discord.Embed(
-            title="⚔️ Панель выбора ролей ⚔️",
+            title="⚔️ Выбор классов ⚔️",
             description="\n".join(description_lines),
             color=discord.Color.red()
         )
@@ -102,8 +117,9 @@ class RoleReactionsWebhook(commands.Cog):
 
         self.role_message_id = message.id
         self.save_role_message_id()
-        logger.success(f"Создано новое сообщение для ролей с ID {self.role_message_id}")
+        logger.info(f"Создано сообщение для ролей с ID {self.role_message_id}")
 
+    # ---------- on_ready ----------
     @commands.Cog.listener()
     async def on_ready(self):
         channel = self.bot.get_channel(self.role_channel_id)
@@ -112,31 +128,32 @@ class RoleReactionsWebhook(commands.Cog):
             return
 
         guild = channel.guild
-        await self.ensure_section_roles(guild)
+        await self.ensure_section_role(guild)
 
         message = None
         if self.role_message_id:
             try:
                 message = await channel.fetch_message(self.role_message_id)
-                logger.info(f"Используем существующее сообщение с ID {self.role_message_id}")
+                logger.info(f"Используем существующее сообщение: {self.role_message_id}")
             except discord.NotFound:
                 logger.warning("Старое сообщение не найдено, создаём новое.")
 
         if not message:
             await self.create_role_message(channel)
 
+    # ---------- Выдача/снятие ролей ----------
     async def modify_member_role(self, payload, add=True):
-        """Выдача или снятие роли с пользователя вместе с ролью-секцией"""
         if payload.user_id == self.bot.user.id:
             return
 
         guild = self.bot.get_guild(payload.guild_id)
-        member = guild.get_member(payload.user_id)
-        if not member:
-            logger.warning(f"Пользователь с ID {payload.user_id} не найден в гильдии {guild.name}")
+        if not guild:
             return
 
-        # Получаем выбранную роль
+        member = guild.get_member(payload.user_id)
+        if not member:
+            return
+
         role_name = self.emoji_roles.get(str(payload.emoji))
         if not role_name:
             return
@@ -146,38 +163,34 @@ class RoleReactionsWebhook(commands.Cog):
             logger.warning(f"Роль {role_name} не найдена в гильдии {guild.name}")
             return
 
-        # Находим секцию, к которой принадлежит эта роль
-        section_role_name = None
-        for section_title, roles in self.sections.items():
-            if any(role_name == short for short, _ in roles.values()):
-                if section_title == "🎮 Игры:":
-                    section_role_name = "ㅤㅤㅤㅤㅤㅤㅤИгры: ㅤㅤㅤㅤㅤㅤㅤㅤ"
-                elif section_title == "📦 Другое:":
-                    section_role_name = "ㅤㅤㅤㅤㅤㅤㅤДругое:ㅤㅤㅤㅤㅤㅤㅤ"
-                break
-
-        section_role = discord.utils.get(guild.roles, name=section_role_name) if section_role_name else None
+        section_role = discord.utils.get(guild.roles, name=self.section_role_name)
 
         try:
             if add:
                 await member.add_roles(role)
-                if section_role:
+                if section_role and section_role not in member.roles:
                     await member.add_roles(section_role)
-                logger.success(f"Выдана роль {role_name} пользователю {member}")
+
+                logger.info(f"Выдана роль {role_name} пользователю {member}")
+
             else:
                 await member.remove_roles(role)
-                # Проверяем, есть ли другие роли из этой секции — если нет, убираем секцию
-                if section_role:
-                    still_has_role_in_section = any(
-                        discord.utils.get(guild.roles, name=short) in member.roles
-                        for short, _ in self.sections[section_title].values()
-                    )
-                    if not still_has_role_in_section:
-                        await member.remove_roles(section_role)
-                logger.success(f"Убрана роль {role_name} у пользователя {member}")
+
+                # Проверяем: остались ли у него ещё роли из списка классов
+                still_has_any_class = any(
+                    discord.utils.get(guild.roles, name=r) in member.roles
+                    for r in self.emoji_roles.values()
+                )
+
+                if section_role and not still_has_any_class:
+                    await member.remove_roles(section_role)
+
+                logger.info(f"Убрана роль {role_name} у пользователя {member}")
+
         except discord.Forbidden:
             logger.error(f"Нет прав для изменения роли {role_name} у {member}")
 
+    # ---------- Реакции ----------
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         if payload.message_id != self.role_message_id:

@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from github import Github
 
-# Форматтер с цветами
+# ---------- Цветной форматтер для консоли ----------
 class ColorFormatter(logging.Formatter):
     COLORS = {
         'DEBUG': '\033[90m',
@@ -23,7 +23,7 @@ class ColorFormatter(logging.Formatter):
         message = super().format(record)
         return f"{color}{message}{reset}"
 
-# Форматтер для Discord
+# ---------- Специальный форматтер для Discord ----------
 class CustomDiscordFormatter(logging.Formatter):
     def format(self, record):
         msg = record.getMessage()
@@ -40,7 +40,7 @@ class CustomDiscordFormatter(logging.Formatter):
 
         return super().format(record)
 
-# Кастомный уровень LOG_PUSH
+# ---------- Кастомный уровень LOG_PUSH ----------
 LOG_PUSH = 35
 logging.addLevelName(LOG_PUSH, "LOG_PUSH")
 
@@ -50,7 +50,7 @@ def log_push(self, message, *args, **kwargs):
 
 logging.Logger.log_push = log_push
 
-# Логгер для GitHub-пушей
+# ---------- Логгер для GitHub ----------
 github_logger = logging.getLogger("github_push")
 github_logger.setLevel(LOG_PUSH)
 github_logger.propagate = False
@@ -60,8 +60,18 @@ console_handler.setFormatter(
 )
 github_logger.addHandler(console_handler)
 
-# Функция пуша лога в GitHub
+# ---------- Flush всех хендлеров ----------
+def flush_all_loggers():
+    for handler in logging.getLogger().handlers:
+        try:
+            handler.flush()
+        except Exception:
+            pass
+
+# ---------- Пуш логов на GitHub ----------
 def push_log_to_github(local_path, github_path, config):
+    flush_all_loggers()  # Важно!
+
     if not os.path.exists(local_path):
         github_logger.log_push(f"❌ Файл не найден: {local_path}")
         return
@@ -76,7 +86,7 @@ def push_log_to_github(local_path, github_path, config):
         g = Github(token)
         repo = g.get_repo(repo_name)
 
-        with open(local_path, "rb") as f:
+        with open(local_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         github_path = f"logs/{github_path}"
@@ -100,16 +110,23 @@ def push_log_to_github(local_path, github_path, config):
     except Exception as e:
         github_logger.log_push(f"❌ Ошибка при пуше в GitHub: {e}")
 
-# Ротация логов и подготовка текущего
+# ---------- Ротация логов и подготовка текущего ----------
 def smart_rotate_and_push(log_dir, log_name, config):
     os.makedirs(log_dir, exist_ok=True)
     today_str = datetime.now().strftime("%Y-%m-%d")
     today_log = os.path.join(log_dir, f"{log_name}_{today_str}.log")
 
-    # Пушим все старые логи
+    # Пушим старые логи
     for file in os.listdir(log_dir):
         if file.startswith(log_name) and file.endswith(".log") and today_str not in file:
             old_log = os.path.join(log_dir, file)
+
+            # Пропускаем пустые логи
+            if os.path.getsize(old_log) == 0:
+                github_logger.log_push(f"⚠️ Пропуск пустого лога: {old_log}")
+                os.remove(old_log)
+                continue
+
             github_logger.log_push(f"Ротация: пушим старый лог {old_log}")
             push_log_to_github(old_log, file, config)
             os.remove(old_log)
@@ -121,7 +138,7 @@ def smart_rotate_and_push(log_dir, log_name, config):
 
     return today_log
 
-# Настройка логгера
+# ---------- Настройка логгера ----------
 def setup_logging(config, log_level=logging.INFO):
     log_format = "%(asctime)s | %(levelname)-8s | %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
@@ -129,7 +146,7 @@ def setup_logging(config, log_level=logging.INFO):
     # Получаем путь к сегодняшнему логу и пушим старые
     log_path = smart_rotate_and_push("logs", "bot", config)
 
-    #Root logger
+    # Root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     root_logger.handlers.clear()

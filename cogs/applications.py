@@ -5,8 +5,8 @@ from discord.ext import commands
 from supabase import create_client, Client
 import logging
 
-# Подключаем твой стильный логгер
-logger = logging.getLogger("Applications")  # Используем уже настроенный логгер
+# Логгер
+logger = logging.getLogger("Applications")
 
 # Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -19,16 +19,10 @@ QUESTIONS = [
     "Как предпочитаешь получать информацию о клановых активностях и новостях?",
     "Сколько часов в неделю ты готов посвящать клану?",
     "Как обычно справляешься с поражениями и стрессовыми ситуациями в игре?",
-    "Ты предпочитаешь действовать в одиночку или в команде? Почему?",
-    "Как воспринимаешь критику и умеешь ли извлекать из неё пользу?",
-    "Какие ожидания у тебя от общения с другими членами клана?",
     "В какое время суток тебе удобнее всего участвовать в клановых событиях?",
-    "Что для тебя страшнее: неожиданные противники или неожиданные задания?",
     "Какая твоя главная цель при вступлении в клан?",
     "В какой стране и часовом поясе ты находишься?",
-    "Если бы Legion Of The Damned была видеоигрой, кем бы ты хотел быть в её истории?",
-    "Придумай свой позывной, которым тебя будут называть в клане.",
-    "Расскажи о самой эпичной победе в своей игровой истории."
+    "Ваша дата рождения"
 ]
 
 COLUMNS = [
@@ -37,17 +31,11 @@ COLUMNS = [
     "Опыт командной работы",
     "Получение информации",
     "Время для клана",
-    "Стрессовые ситуации в играх",
-    "Одиначка или командный игрок",
-    "Восприятие критики",
-    "Ожидание от соклановцев",
-    "Время для матчей",
-    "Что страшнее",
-    "Цель вступления в клан",
-    "Место положения",
-    "Кем ты был бы",
-    "Новый позывной в клане",
-    "Самая эпичная победа в истории"
+    "Стресс и поражения",
+    "Удобное время для активностей",
+    "Цель вступления",
+    "Страна и часовой пояс",
+    "Дата рождения"
 ]
 
 def push_to_supabase(user_name, answers):
@@ -55,7 +43,7 @@ def push_to_supabase(user_name, answers):
         data = {col: ans for col, ans in zip(COLUMNS, [user_name] + answers)}
         response = supabase.table("applications").insert(data).execute()
         if response.data:
-            logger.success(f"Заявка {user_name} успешно сохранена в Supabase")
+            logger.info(f"Заявка {user_name} успешно сохранена в Supabase")
         else:
             logger.error(f"Ошибка при сохранении заявки {user_name}: пустой ответ")
     except Exception as e:
@@ -64,45 +52,55 @@ def push_to_supabase(user_name, answers):
 class Applications(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.APPLICATIONS_CHANNEL_ID = 1297692294878859314
+        self.APPLICATIONS_CHANNEL_ID = 1460785447331430572
         self.MEMBER_ROLE_NAME = "💀Легион Проклятых🔥"
         self.OLD_ROLE_NAME = "🤝Друг клана🚩"
         self.active_applications = set()
-        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "Администратор"]
-        self.NOTIFY_ROLE_ID = 828749920411713588
+        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "💀Заместитель Магистра🔥", "Администратор"]
 
+        # теперь можно сколько угодно ролей
+        self.NOTIFY_ROLE_IDS = [828749920411713588, 1418038038499692585]
+
+    # -------- Проверка стаффа --------
     async def is_staff(self, interaction: discord.Interaction):
         if interaction.user.guild_permissions.administrator:
             return True
-        if any(discord.utils.get(interaction.guild.roles, name=role) in interaction.user.roles for role in self.STAFF_ROLES):
+        if any(discord.utils.get(interaction.guild.roles, name=r) in interaction.user.roles for r in self.STAFF_ROLES):
             return True
         raise app_commands.MissingPermissions(["administrator"])
 
+    # -------- Команда заявки --------
     @app_commands.command(name="заявка", description="Подать заявку на вступление")
     async def application(self, interaction: discord.Interaction):
         user_id = interaction.user.id
+
         if user_id in self.active_applications:
             return await interaction.response.send_message(
-                "⏳ У вас уже открыта активная заявка. Завершите её перед началом новой.",
+                "⏳ У тебя уже есть активная заявка. Заверши её перед новой.",
                 ephemeral=True
             )
+
         self.active_applications.add(user_id)
 
         try:
             answers = []
+
+            # создаём ЛС
             try:
                 channel = await interaction.user.create_dm()
             except discord.Forbidden:
                 self.active_applications.remove(user_id)
                 return await interaction.response.send_message(
-                    "❌ Не удалось отправить ЛС. Разрешите личные сообщения от участников сервера.",
+                    "❌ Не удалось написать в ЛС. Разреши личные сообщения от участников сервера.",
                     ephemeral=True
                 )
 
             await interaction.response.send_message(
-                "📩 Я отправил тебе личные сообщения с вопросами для заявки!", ephemeral=True
+                "📩 Я отправил тебе вопросы в личные сообщения!",
+                ephemeral=True
             )
-            await channel.send("Привет! Начнём заполнение заявки. Ниже будут вопросы для тебя.")
+
+            await channel.send("Привет! Начнём заполнение заявки 👇")
 
             for question in QUESTIONS:
                 await channel.send(question)
@@ -111,15 +109,16 @@ class Applications(commands.Cog):
                     return m.author == interaction.user and isinstance(m.channel, discord.DMChannel)
 
                 try:
-                    msg = await self.bot.wait_for('message', check=check, timeout=300)
+                    msg = await self.bot.wait_for("message", check=check, timeout=300)
                     answers.append(msg.content)
                 except:
-                    await channel.send("⏰ Время на ответ истекло. Попробуй снова командой /заявка.")
+                    await channel.send("⏰ Время на ответ истекло. Запусти /заявка ещё раз.")
                     return
 
+            # канал заявок
             application_channel = self.bot.get_channel(self.APPLICATIONS_CHANNEL_ID)
             if not isinstance(application_channel, discord.TextChannel):
-                return await channel.send("❌ Ошибка: канал для заявок не настроен!")
+                return await channel.send("❌ Канал для заявок не найден.")
 
             embed = discord.Embed(
                 title="📄 Новая заявка",
@@ -127,34 +126,36 @@ class Applications(commands.Cog):
                 color=discord.Color.blue()
             )
 
-            for question, answer in zip(QUESTIONS, answers):
-                embed.add_field(name=question, value=answer, inline=False)
+            for q, a in zip(QUESTIONS, answers):
+                embed.add_field(name=q, value=a, inline=False)
+
             embed.set_footer(text=f"ID пользователя: {interaction.user.id}")
 
             msg = await application_channel.send(embed=embed)
-            await msg.add_reaction('✅')
-            await msg.add_reaction('❌')
+            await msg.add_reaction("✅")
+            await msg.add_reaction("❌")
 
-            await channel.send("✅ Ваша заявка отправлена на рассмотрение!")
+            await channel.send("✅ Заявка отправлена на рассмотрение!")
 
-            # Определяем guild
-            guild = interaction.guild
-            if guild is None:
-                for g in self.bot.guilds:
-                    if g.get_member(interaction.user.id):
-                        guild = g
-                        break
+            # -------- уведомления --------
+            guild = interaction.guild or discord.utils.get(
+                self.bot.guilds, 
+                lambda g: g.get_member(interaction.user.id)
+            )
 
             if guild:
-                notify_role = guild.get_role(self.NOTIFY_ROLE_ID)
-                if notify_role:
+                for role_id in self.NOTIFY_ROLE_IDS:
+                    notify_role = guild.get_role(role_id)
+                    if not notify_role:
+                        continue
+
                     for member in notify_role.members:
                         if member.bot:
                             continue
                         try:
-                            dm_channel = await member.create_dm()
-                            await dm_channel.send(
-                                f"📩 Новая заявка от {interaction.user.mention} готова к рассмотрению: {msg.jump_url}"
+                            dm = await member.create_dm()
+                            await dm.send(
+                                f"📩 Новая заявка от {interaction.user.mention}: {msg.jump_url}"
                             )
                             logger.info(f"Уведомление отправлено {member}")
                         except discord.Forbidden:
@@ -166,43 +167,61 @@ class Applications(commands.Cog):
 
         except Exception as e:
             logger.error(f"Ошибка в команде заявка: {e}")
-            await interaction.response.send_message(
-                "❌ Произошла ошибка при отправке заявки.", ephemeral=True
-            )
+
+            # защита от двойного ответа
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ Произошла ошибка при отправке заявки.",
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ Произошла ошибка при отправке заявки.",
+                    ephemeral=True
+                )
+
         finally:
             self.active_applications.discard(user_id)
 
+    # -------- Реакции --------
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         try:
             if payload.channel_id != self.APPLICATIONS_CHANNEL_ID:
                 return
+
             guild = self.bot.get_guild(payload.guild_id)
             if not guild:
                 return
+
             member = guild.get_member(payload.user_id)
             if not member or member.bot:
                 return
+
             channel = self.bot.get_channel(payload.channel_id)
             if not channel:
                 return
+
             message = await channel.fetch_message(payload.message_id)
             if not message.embeds:
                 return
 
-            if not (member.guild_permissions.administrator or any(role.name in self.STAFF_ROLES for role in member.roles)):
+            # проверка стаффа
+            if not (
+                member.guild_permissions.administrator or
+                any(role.name in self.STAFF_ROLES for role in member.roles)
+            ):
                 return
 
             embed = message.embeds[0]
             if not embed.footer or not embed.footer.text:
                 return
-            footer_parts = embed.footer.text.split("ID пользователя: ")
-            if len(footer_parts) < 2:
-                return
+
             try:
-                user_id = int(footer_parts[1])
-            except ValueError:
+                user_id = int(embed.footer.text.split("ID пользователя: ")[1])
+            except:
                 return
+
             target_member = guild.get_member(user_id)
             if not target_member:
                 return
@@ -210,20 +229,23 @@ class Applications(commands.Cog):
             old_role = discord.utils.get(guild.roles, name=self.OLD_ROLE_NAME)
             new_role = discord.utils.get(guild.roles, name=self.MEMBER_ROLE_NAME)
 
-            if str(payload.emoji) == '✅':
+            if str(payload.emoji) == "✅":
                 if old_role in target_member.roles:
                     await target_member.remove_roles(old_role)
                 if new_role:
                     await target_member.add_roles(new_role)
+
                 await message.delete()
+
                 try:
-                    await target_member.send('🎉 Ваша заявка была одобрена! Добро пожаловать в клан!')
-                    logger.success(f"Заявка одобрена: {target_member}")
+                    await target_member.send("🎉 Заявка одобрена! Добро пожаловать в клан!")
+                    logger.info(f"Заявка одобрена: {target_member}")
                 except discord.Forbidden:
                     logger.warning(f"Не удалось отправить ЛС {target_member}")
-            elif str(payload.emoji) == '❌':
+
+            elif str(payload.emoji) == "❌":
                 try:
-                    await target_member.send('😕 Ваша заявка была отклонена модератором.')
+                    await target_member.send("😕 К сожалению, заявка была отклонена.")
                     logger.info(f"Заявка отклонена: {target_member}")
                 except discord.Forbidden:
                     logger.warning(f"Не удалось отправить ЛС {target_member}")
@@ -231,5 +253,6 @@ class Applications(commands.Cog):
         except Exception as e:
             logger.error(f"Ошибка в обработке реакций: {e}")
 
+# -------- setup --------
 async def setup(bot):
     await bot.add_cog(Applications(bot))
