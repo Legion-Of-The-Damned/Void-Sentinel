@@ -37,33 +37,56 @@ def getenv_list(key):
 
 def load_config():
     config = {
+        # --- Discord ---
         "DISCORD_TOKEN": os.getenv("DISCORD_TOKEN"),
         "GUILD_ID": getenv_int("GUILD_ID"),
         "CHANNEL_ID": getenv_int("CHANNEL_ID"),
         "VERIFY_CHANNEL_ID": getenv_int("VERIFY_CHANNEL_ID"),
         "VERIFIED_ROLE_ID": getenv_int("VERIFIED_ROLE_ID"),
         "VERIFY_EMOJI": os.getenv("VERIFY_EMOJI", "✅"),
+
+        # --- Webhook ---
         "WEBHOOK_URL": os.getenv("WEBHOOK_URL"),
-        "IMAGE_URL": os.getenv(
-            "IMAGE_URL",
-            "https://cdn.discordapp.com/attachments/1355929392072753262/1370486966977691689/ChatGPT_Image_9_._2025_._22_45_29.png"
-        ),
         "AVATAR_URL": os.getenv(
             "AVATAR_URL",
             "https://cdn.discordapp.com/attachments/1355929392072753262/1367553212474982420/Void_Sentinel.jpg"
         ),
-        "CLAN_ROLE_NAMES": os.getenv("CLAN_ROLE_NAMES", "💀Легион Проклятых🔥").split(","),
+
+        # --- Embed images (РАЗДЕЛЕНЫ) ---
+        "HELP_IMAGE_URL": os.getenv(
+            "HELP_IMAGE_URL",
+            "https://cdn.discordapp.com/attachments/1355929392072753262/1355975277930348675/ChatGPT_Image_30_._2025_._21_11_52.png?ex=69751263&is=6973c0e3&hm=d10e91dc91f47c7ae0e716e3dff3a3f340e127c6a3a3923959c4d0e30da3bdca&"
+        ),
+        "WELCOME_IMAGE_URL": os.getenv(
+            "WELCOME_IMAGE_URL",
+            "https://cdn.discordapp.com/attachments/1355929392072753262/1370486966977691689/ChatGPT_Image_9_._2025_._22_45_29.png?ex=69752173&is=6973cff3&hm=0ac9cdf1bfc449494894c6ed918144cd661d05153120ff28387cf500b9bc5c3f&"
+        ),
+
+        # --- Roles / Clan ---
+        "CLAN_ROLE_NAMES": os.getenv(
+            "CLAN_ROLE_NAMES",
+            "💀Легион Проклятых🔥"
+        ).split(","),
+
+        "CLAN_ROLE_IDS": getenv_list("CLAN_ROLE_IDS"),
         "APPLICATIONS_CHANNEL_ID": getenv_int("APPLICATIONS_CHANNEL_ID"),
         "MEMBER_ROLE_ID": getenv_int("MEMBER_ROLE_ID"),
-        "STAFF_ROLE_NAME": os.getenv("STAFF_ROLE_NAME", "Модератор"),
-        "CLAN_ROLE_IDS": getenv_list("CLAN_ROLE_IDS"),
         "FRIEND_ROLE_ID": getenv_int("FRIEND_ROLE_ID"),
+        "STAFF_ROLE_NAME": os.getenv("STAFF_ROLE_NAME", "Модератор"),
+
+        # --- GitHub ---
         "GITHUB_TOKEN": os.getenv("MY_GITHUB_TOKEN"),
-        "REPO_NAME": os.getenv("REPO_NAME", "Legion-Of-The-Damned/-VS-Data-Base"),
+        "REPO_NAME": os.getenv(
+            "REPO_NAME",
+            "Legion-Of-The-Damned/-VS-Data-Base"
+        ),
+
+        # --- Supabase ---
         "SUPABASE_URL": os.getenv("SUPABASE_URL"),
         "SUPABASE_KEY": os.getenv("SUPABASE_KEY"),
 
-        "QUIZ_QUESTIONS_PATH": "quiz_questions.json"
+        # --- Quiz ---
+        "QUIZ_QUESTIONS_PATH": "quiz_questions.json",
     }
 
     return config

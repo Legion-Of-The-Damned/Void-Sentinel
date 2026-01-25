@@ -126,4 +126,4 @@ class Events(commands.Cog):
 async def setup(bot):
     from config import load_config
     config = load_config()
-    await bot.add_cog(Events(bot, config["AVATAR_URL"], config["IMAGE_URL"]))
+    await bot.add_cog(Events(bot, config["AVATAR_URL"], config["WELCOME_IMAGE_URL"]))

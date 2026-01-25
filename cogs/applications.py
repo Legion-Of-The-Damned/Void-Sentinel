@@ -49,17 +49,16 @@ def push_to_supabase(user_name, answers):
     except Exception as e:
         logger.error(f"Ошибка при подключении к Supabase: {e}")
 
+
 class Applications(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.APPLICATIONS_CHANNEL_ID = 1460785447331430572
+        self.APPLICATIONS_CHANNEL_ID = 1464448287733059634
         self.MEMBER_ROLE_NAME = "💀Легион Проклятых🔥"
-        self.OLD_ROLE_NAME = "🤝Друг клана🚩"
+        self.OLD_ROLE_NAME = ["🤝Друг клана🚩", "💀Неофит🌱"]
         self.active_applications = set()
-        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "💀Заместитель Магистра🔥", "Администратор"]
-
-        # теперь можно сколько угодно ролей
-        self.NOTIFY_ROLE_IDS = [828749920411713588, 1418038038499692585]
+        self.STAFF_ROLES = ["🔥Огненный Магистр🎩", "💀Заместитель Магистра🔥", "☠️Капитан🔸"]
+        self.NOTIFY_ROLE_IDS = [828749920411713588, 1429978575347519610]
 
     # -------- Проверка стаффа --------
     async def is_staff(self, interaction: discord.Interaction):
@@ -138,19 +137,19 @@ class Applications(commands.Cog):
             await channel.send("✅ Заявка отправлена на рассмотрение!")
 
             # -------- уведомления --------
-            guild = interaction.guild or discord.utils.get(
-                self.bot.guilds, 
-                lambda g: g.get_member(interaction.user.id)
-            )
+            guild = interaction.guild
+            if not guild:
+                guild = next((g for g in self.bot.guilds if g.get_member(interaction.user.id)), None)
 
             if guild:
+                notified_users = set()  # уникальность уведомлений
                 for role_id in self.NOTIFY_ROLE_IDS:
                     notify_role = guild.get_role(role_id)
                     if not notify_role:
                         continue
 
                     for member in notify_role.members:
-                        if member.bot:
+                        if member.bot or member.id in notified_users:
                             continue
                         try:
                             dm = await member.create_dm()
@@ -158,6 +157,7 @@ class Applications(commands.Cog):
                                 f"📩 Новая заявка от {interaction.user.mention}: {msg.jump_url}"
                             )
                             logger.info(f"Уведомление отправлено {member}")
+                            notified_users.add(member.id)
                         except discord.Forbidden:
                             logger.warning(f"Не удалось отправить ЛС {member}")
                         except Exception as e:
@@ -168,7 +168,6 @@ class Applications(commands.Cog):
         except Exception as e:
             logger.error(f"Ошибка в команде заявка: {e}")
 
-            # защита от двойного ответа
             if not interaction.response.is_done():
                 await interaction.response.send_message(
                     "❌ Произошла ошибка при отправке заявки.",
@@ -206,11 +205,7 @@ class Applications(commands.Cog):
             if not message.embeds:
                 return
 
-            # проверка стаффа
-            if not (
-                member.guild_permissions.administrator or
-                any(role.name in self.STAFF_ROLES for role in member.roles)
-            ):
+            if not (member.guild_permissions.administrator or any(role.name in self.STAFF_ROLES for role in member.roles)):
                 return
 
             embed = message.embeds[0]
@@ -226,16 +221,28 @@ class Applications(commands.Cog):
             if not target_member:
                 return
 
-            old_role = discord.utils.get(guild.roles, name=self.OLD_ROLE_NAME)
+            old_roles = [discord.utils.get(guild.roles, name=r) for r in self.OLD_ROLE_NAME]
             new_role = discord.utils.get(guild.roles, name=self.MEMBER_ROLE_NAME)
 
             if str(payload.emoji) == "✅":
-                if old_role in target_member.roles:
-                    await target_member.remove_roles(old_role)
+                for role in old_roles:
+                    if role in target_member.roles:
+                        await target_member.remove_roles(role)
                 if new_role:
                     await target_member.add_roles(new_role)
 
-                await message.delete()
+                # Добавление тега клана к нику
+                clan_tag = "[LOTD]"
+                current_nick = target_member.nick or target_member.name
+                if not current_nick.startswith(clan_tag):
+                    try:
+                        new_nick = f"{clan_tag} {current_nick}"
+                        await target_member.edit(nick=new_nick)
+                        logger.info(f"Тег клана добавлен к {target_member}: {new_nick}")
+                    except discord.Forbidden:
+                        logger.warning(f"Не удалось изменить ник {target_member} — недостаточно прав")
+                    except Exception as e:
+                        logger.error(f"Ошибка при изменении ника {target_member}: {e}")
 
                 try:
                     await target_member.send("🎉 Заявка одобрена! Добро пожаловать в клан!")
@@ -252,6 +259,7 @@ class Applications(commands.Cog):
 
         except Exception as e:
             logger.error(f"Ошибка в обработке реакций: {e}")
+
 
 # -------- setup --------
 async def setup(bot):

@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("discord")
 
-BOT_VERSION = "3.5.2"  # обновленная версия с напоминаниями
+BOT_VERSION = "3.5.4"  # обновленная версия с напоминаниями
 
 # Путь к файлу с напоминаниями
 DATA_DIR = "data"
@@ -110,7 +110,7 @@ class GeneralCommands(commands.Cog):
             color=discord.Color.red()
         )
 
-        embed.set_image(url=config["IMAGE_URL"])
+        embed.set_image(url=config["HELP_IMAGE_URL"])
 
         await interaction.response.send_message(embed=embed)
         logger.info(f"📖 /помощь | Пользователь: {interaction.user} | Сервер: {interaction.guild.name if interaction.guild else 'ЛС'}")

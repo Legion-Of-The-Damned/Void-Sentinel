@@ -1,0 +1,27 @@
+2026-01-25 01:54:04 | INFO     | HTTP Request: GET https://jqphrrikzkntcyzsrbrc.supabase.co/rest/v1/active_duels?select=%2A "HTTP/2 200 OK"
+2026-01-25 01:54:04 | INFO     | HTTP Request: GET https://jqphrrikzkntcyzsrbrc.supabase.co/rest/v1/duel_stats?select=%2A "HTTP/2 200 OK"
+2026-01-25 01:54:04 | INFO     | ✅ Данные из Supabase загружены
+2026-01-25 01:54:05 | INFO     | Загружен ID сообщения для ролей: 1461505686071541934
+2026-01-25 01:54:05 | SUCCESS  | 🎉 Все файлы cogs успешно загружены!
+2026-01-25 01:54:09 | SUCCESS  | 🤖 Бот `Void Sentinel#5662` успешно запущен (ID: 1230464176745480254)
+2026-01-25 01:54:09 | INFO     | 🛡 Сервер: Legion Of The Damned | ID: 828749346505490503 | Участников: 29
+2026-01-25 01:54:09 | INFO     | 🛡 Сервер: Space_Marine 2RU | ID: 1118852004786225192 | Участников: 272
+2026-01-25 01:54:09 | INFO     | 🛡 Сервер: winie's server | ID: 1335265286198263848 | Участников: 56
+2026-01-25 01:54:09 | INFO     | 🛡 Сервер: Legion of Iron Hands | ID: 1411434026966716428 | Участников: 5
+2026-01-25 01:54:09 | INFO     | Используем существующее сообщение: 1461505686071541934
+2026-01-25 01:54:09 | SUCCESS  | Команды успешно синхронизированы
+2026-01-25 01:55:02 | ERROR    | Task exception was never retrieved
+future: <Task finished name='Task-22' coro=<Music.player_loop() done, defined at /workspaces/Void-Sentinel/cogs/music.py:271> exception=ClientException('ffmpeg was not found.')>
+Traceback (most recent call last):
+  File "/workspaces/Void-Sentinel/cogs/music.py", line 305, in player_loop
+    source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/.local/lib/python3.12/site-packages/discord/player.py", line 346, in __init__
+    super().__init__(source, executable=executable, args=args, **subprocess_kwargs)
+  File "/home/codespace/.local/lib/python3.12/site-packages/discord/player.py", line 183, in __init__
+    self._process = self._spawn_process(args, **kwargs)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/.local/lib/python3.12/site-packages/discord/player.py", line 209, in _spawn_process
+    raise ClientException(executable + ' was not found.') from None
+discord.errors.ClientException: ffmpeg was not found.
+2026-01-25 01:55:11 | WARNING  | 🛑 Запуск остановлен вручную.
