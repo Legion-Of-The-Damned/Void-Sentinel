@@ -33,9 +33,11 @@ async def load_cogs(bot: commands.Bot):
         "cogs.events",
         "cogs.general",
         "cogs.info",
+        "cogs.clan_war",
         "cogs.music",
         "cogs.quiz",
         "cogs.rps",
+        "cogs.voice",
         "cogs.voting"
     ]
 
