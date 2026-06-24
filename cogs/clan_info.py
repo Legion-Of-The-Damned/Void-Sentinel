@@ -2,86 +2,173 @@ import discord
 import logging
 from discord.ext import commands
 from discord import app_commands
-from config import load_config
 
-# --- Настройка логгера ---
 logger = logging.getLogger("ClanInfo")
+
+CLAN_ROLE_ID = 1151988594148376709
+
+RANKS = {
+    "🔥Огненный Магистр🎩": 828749920411713588,
+    "💀Заместитель Магистра⚠️": 1491133532796354581,
+    "💀Полковник🏴‍☠️": 1491445605040394423,
+    "☠️Капелан⚜️": 1482830190496452801
+}
+
+SQUADS = {
+    "Растаманы": 1462462544500494366,
+    "Подпивасы": 1488193467351044298,
+    "Биошники": 1463902948265562194,
+    "Берсерки": 1477393602836693175,
+    "Рапторы": 1481814155433607249,
+    "Беркуты": 1462462580181303337,
+    "Галики": 1463902788122837023,
+    "Резерв": 1494718879761694781
+}
+
+OFFICER_ROLE_ID = 1491133766448578570
+DEPUTY_ROLE_ID = 1463901614019711070
+AFK_ROLE_ID = 1470135285277786175
 
 
 class ClanInfo(commands.Cog):
-    def __init__(self, bot: commands.Bot, clan_role_names: list[str]):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.clan_role_names = clan_role_names
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        try:
-            await self.bot.tree.sync()
-            logger.success("Команды успешно синхронизированы")
-        except Exception as e:
-            logger.error(f"Ошибка при синхронизации команд: {e}")
-
-    @app_commands.command(name="состав_клана", description="Отправить информацию о составе клана.")
+    @app_commands.command(name="состав_клана", description="Состав клана")
     async def clan_info(self, interaction: discord.Interaction):
-        await self.send_clan_member_info(interaction)
 
-    async def send_clan_member_info(self, interaction: discord.Interaction):
         guild = interaction.guild
-        channel = interaction.channel
+        if not guild:
+            return await interaction.response.send_message("❌ Только сервер")
 
-        if not channel.permissions_for(guild.me).manage_webhooks:
-            await interaction.response.send_message(
-                "❌ У меня нет прав на создание вебхуков в этом канале.",
-                ephemeral=True
+        embed = discord.Embed(
+            title="⚔️ Legion Of The Damned",
+            color=discord.Color.red()
+        )
+
+        rank_groups = {k: [] for k in RANKS}
+        squad_groups = {k: [] for k in SQUADS}
+
+        afk = []
+        undefined = []
+        total = 0
+
+        # --- СБОР ДАННЫХ ---
+        for m in guild.members:
+            if m.bot:
+                continue
+
+            if not discord.utils.get(m.roles, id=CLAN_ROLE_ID):
+                continue
+
+            name = m.display_name
+
+            # AFK
+            if discord.utils.get(m.roles, id=AFK_ROLE_ID):
+                afk.append(name)
+                continue
+
+            # РАНГ (1 шт)
+            has_rank = False
+            for r, rid in RANKS.items():
+                if discord.utils.get(m.roles, id=rid):
+                    rank_groups[r].append(name)
+                    has_rank = True
+                    break
+
+            # ОТРЯД
+            assigned = False
+            for s, sid in SQUADS.items():
+                if discord.utils.get(m.roles, id=sid):
+                    squad_groups[s].append(m)
+                    assigned = True
+                    break
+
+            if not assigned and not has_rank:
+                undefined.append(name)
+
+            total += 1
+
+        embed.description = f"👥 Всего бойцов: **{total}**"
+
+        # --- КОМАНДОВАНИЕ ---
+        top_lines = []
+
+        for r in RANKS:
+            if rank_groups[r]:
+                rank_groups[r].sort()
+
+                top_lines.append(r)
+                top_lines += [f"• {x}" for x in rank_groups[r]]
+                top_lines.append("")
+
+        if top_lines:
+            embed.add_field(
+                name="🔥 Командование",
+                value="\n".join(top_lines).strip()[:1024],
+                inline=False
             )
-            logger.warning(f"Нет прав на создание вебхуков в канале {channel.name} ({guild.name})")
-            return
 
-        try:
-            webhook = await channel.create_webhook(name=self.bot.user.name)
+        # --- ОТРЯДЫ ---
+        for squad, members in squad_groups.items():
+            if not members:
+                continue
 
-            members_by_role = {role: [] for role in self.clan_role_names}
-            for member in guild.members:
-                for role in member.roles:
-                    if role.name in members_by_role:
-                        members_by_role[role.name].append(member)
+            officers = []
+            deputies = []
+            players = []
 
-            total_members = sum(len(members) for members in members_by_role.values())
+            for m in members:
+                name = m.display_name
 
-            description_lines = [f"**Количество участников клана:** {total_members}", "**Участники клана:**"]
-            for role in reversed(self.clan_role_names):
-                members = members_by_role[role]
-                if members:
-                    description_lines.append(f"\n**{role}**")
-                    for member in members:
-                        name = member.display_name
-                        if not name.startswith("[LOTD]"):
-                            name = f"[LOTD] {name}"
-                        description_lines.append(f"- {name}")
+                if discord.utils.get(m.roles, id=OFFICER_ROLE_ID):
+                    officers.append(f"🔸 Офицер: {name}")
+                elif discord.utils.get(m.roles, id=DEPUTY_ROLE_ID):
+                    deputies.append(f"🔺 Зам: {name}")
+                else:
+                    players.append(f"• {name}")
 
-            embed = discord.Embed(
-                title="Информация о составе клана",
-                description="\n".join(description_lines),
-                color=discord.Color.red()
+            officers.sort()
+            deputies.sort()
+            players.sort()
+
+            lines = [
+                "━━━━━━━━━━━━━━━",
+                f"🪖 **{squad.upper()}**",
+                "━━━━━━━━━━━━━━━"
+            ]
+
+            # строго по порядку
+            lines.extend(officers)
+            lines.extend(deputies)
+            lines.extend(players)
+
+            embed.add_field(
+                name="‎",
+                value="\n".join(lines)[:1024],
+                inline=False
             )
-            embed.set_footer(
-                text=f"Запрошено: {interaction.user}",
-                icon_url=interaction.user.avatar.url if interaction.user.avatar else None
+
+        # --- AFK ---
+        if afk:
+            afk.sort()
+            embed.add_field(
+                name="💤 AFK",
+                value="\n".join(afk)[:1024],
+                inline=False
             )
-            embed.timestamp = discord.utils.utcnow()
 
-            avatar_url = self.bot.user.avatar.url if self.bot.user.avatar else None
-            await webhook.send(embed=embed, avatar_url=avatar_url)
-            await webhook.delete()
+        # --- ЛЕГИОН ПРОКЛЯТЫХ ---
+        if undefined:
+            undefined.sort()
+            embed.add_field(
+                name="💀 Легион Проклятых",
+                value="\n".join(undefined)[:1024],
+                inline=False
+            )
 
-            await interaction.response.send_message("✅ Информация о клане отправлена через вебхук.", ephemeral=True)
-            logger.success(f"{interaction.user} отправил информацию о составе клана через вебхук")
-        except Exception as e:
-            logger.error(f"Ошибка при отправке информации о клане: {e}")
-            await interaction.response.send_message("❌ Не удалось отправить информацию о клане.", ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
-# --- Setup ---
 async def setup(bot: commands.Bot):
-    config = load_config()
-    await bot.add_cog(ClanInfo(bot, config["CLAN_ROLE_NAMES"]))
+    await bot.add_cog(ClanInfo(bot))
