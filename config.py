@@ -44,9 +44,10 @@ def load_config():
         "VERIFIED_ROLE_ID": getenv_int("VERIFIED_ROLE_ID"),
         "VERIFY_EMOJI": os.getenv("VERIFY_EMOJI", "✅"),
         "WEBHOOK_URL": os.getenv("WEBHOOK_URL"),
+        "BANNER_URL": os.getenv("BANNER_URL"),
         "IMAGE_URL": os.getenv(
             "IMAGE_URL",
-            "https://cdn.discordapp.com/attachments/1355929392072753262/1370486966977691689/ChatGPT_Image_9_._2025_._22_45_29.png"
+            "https://cdn.discordapp.com/attachments/1355929392072753262/1370486966977691689/ChatGPT_Image_9_._2025_._22_45_29.png?ex=6a00e073&is=69ff8ef3&hm=fa58d2bcbac7af9f70e9ac7f659eb7a4b62ca29abb1579e34e3ad4d4c04eeef0&"
         ),
         "AVATAR_URL": os.getenv(
             "AVATAR_URL",
