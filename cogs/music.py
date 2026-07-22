@@ -6,7 +6,7 @@ import yt_dlp
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-FFMPEG_EXE = os.path.join(BASE_DIR, "ffmpeg", "bin", "ffmpeg.exe")
+FFMPEG_EXE = "ffmpeg"
 
 FFMPEG_OPTIONS = {'options': '-vn'}
 
@@ -423,6 +423,11 @@ class Music(commands.Cog):
                 })
         except Exception as e:
             await interaction.followup.send(f"❌ Ошибка при поиске: {e}", ephemeral=True)
+            return
+
+        # Проверка, что найдены треки
+        if not tracks:
+            await interaction.followup.send(f"❌ По запросу **{запрос}** ничего не найдено. Попробуйте изменить запрос.", ephemeral=True)
             return
 
         if len(tracks) > 1:
